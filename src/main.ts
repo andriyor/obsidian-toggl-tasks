@@ -158,7 +158,10 @@ export default class TogglTasksPlugin extends Plugin {
 		await workspace.revealLeaf(leaf);
 	}
 
-	/** The note's `toggl_project`, else a choice from the projects file (Esc = none). */
+	/**
+	 * The note's `toggl_project`, else a choice from the projects file (Esc = none)
+	 * that is saved as the note's `toggl_project`.
+	 */
 	private async pickProject(file: TFile | null): Promise<Project | null> {
 		const projects = await this.loadProjects();
 		const wanted: unknown = file
@@ -170,7 +173,18 @@ export default class TogglTasksPlugin extends Plugin {
 				new Notice(`Toggl: project "${wanted}" is not in ${this.settings.projectsPath}`);
 			return project ?? null;
 		}
-		return projects.length ? new ProjectModal(this.app, projects).choose() : null;
+		if (!projects.length) return null;
+		const project = await new ProjectModal(this.app, projects).choose();
+		// Remember the choice so the note's other tasks don't ask again.
+		if (project && file) {
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(fm: Record<string, unknown>) => {
+					fm[PROJECT_PROPERTY] = project.name;
+				},
+			);
+		}
+		return project;
 	}
 
 	private async loadProjects(): Promise<Project[]> {

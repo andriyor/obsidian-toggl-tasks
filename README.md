@@ -6,7 +6,7 @@ Obsidian plugin that starts a [Toggl Track](https://toggl.com/track/) timer from
 
 - **▶ next to every open task** in the editor (Live Preview and source mode) starts a timer. The command **Start timer for task on current line** does the same for the line under the cursor.
   - Description: the task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets.
-  - Project: the note's `toggl_project` property, looked up by name in the projects file. Without it you pick one from the list, or press Esc for no project.
+  - Project: the note's `toggl_project` property, looked up by name in the projects file. Without it you pick one from the list and it is saved as the note's `toggl_project`, so other tasks in the note don't ask again; Esc starts without a project and saves nothing.
   - Tags: ids returned by the optional tags URL.
   - With a project, the first start creates a **Toggl task** (Starter plan or higher) named after the task and writes its reference into the line: `[toggl_task:: <project id>/<task id>]`. Later starts reuse it without asking for the project.
 - **Update tracked time in current note** reads each task's total from Toggl and writes it:
