@@ -383,7 +383,7 @@ class TogglTasksSettingTab extends PluginSettingTab {
 			.setDesc("Optional. Returns [{ id }] of tags added to every new timer.")
 			.addText((text) =>
 				text
-					.setPlaceholder("https://tags.lan/api/selected-tags")
+					.setPlaceholder("http://tags.lan/api/selected-tags")
 					.setValue(this.plugin.settings.tagsUrl)
 					.onChange(async (value) => {
 						this.plugin.settings.tagsUrl = value.trim();

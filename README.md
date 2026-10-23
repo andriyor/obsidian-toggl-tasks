@@ -8,11 +8,11 @@ Desktop only.
 
 ## Setup
 
-| Setting       | Description                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| API token     | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.          |
-| Projects file | Vault path of a JSON file `{ "project name": id }`                                                              |
-| Tags URL      | Optional. Returns `[{ "id": 123 }, …]`. Self-signed HTTPS certificates are accepted, so it can be a LAN server. |
+| Setting       | Description                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| API token     | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git. |
+| Projects file | Vault path of a JSON file `{ "project name": id }`                                                     |
+| Tags URL      | Optional. Returns `[{ "id": 123 }, …]`.                                                                |
 
 ## Start a timer
 
@@ -76,7 +76,6 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 - **Projects come from a hand-kept JSON file.** Projects rarely change, and a local name → id map avoids an API call per start. `GET /me/projects` returns all of them unpaginated, unlike `/workspaces/{id}/projects`, which cuts off at the first page. A picked project is saved per note as `toggl_project`.
 - **Token in `.env`, not in plugin settings.** Plugin `data.json` can end up in git when a vault is versioned; `.env` stays out of it and can be shared with other Toggl scripts. Obsidian's secret storage is a todo.
 - **Running timer polls rarely.** `/me` requests are capped at 30 per hour per user across all Toggl clients, so the view polls every 5 minutes, only when visible and focused, and shows a just-started timer from the start response.
-- **Tags go through Node `https`.** The tags URL may be a LAN server with a self-signed certificate, which Obsidian's `requestUrl` rejects; this is what makes the plugin desktop only.
 
 ## Development
 
