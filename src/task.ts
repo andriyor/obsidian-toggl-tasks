@@ -7,6 +7,7 @@ const TIME_FIELD = "toggl";
 const REF_FIELD = "toggl_task";
 const OWN_FIELDS_RE = /\s*\[toggl(?:_task)?:: [^\]]*\]/gu;
 const REF_RE = /\[toggl_task:: (\d+)\/(\d+)\]/u;
+const TIME_RE = /\[toggl:: ([^\]]*)\]/u;
 
 // Tasks plugin metadata (emoji format).
 const META_RE = new RegExp(
@@ -36,6 +37,8 @@ export interface Task {
 	description: string;
 	done: boolean;
 	ref: TaskRef | null;
+	/** Last synced `h:mm`, if any. */
+	time: string | null;
 }
 
 export function parseTask(line: string): Task | null {
@@ -52,6 +55,7 @@ export function parseTask(line: string): Task | null {
 		description,
 		done: DONE_STATUSES.has(m[1]),
 		ref: ref ? { projectId: Number(ref[1]), taskId: Number(ref[2]) } : null,
+		time: TIME_RE.exec(m[2])?.[1] ?? null,
 	};
 }
 

@@ -7,6 +7,7 @@ import {
 	ViewUpdate,
 	WidgetType,
 } from "@codemirror/view";
+import { setIcon } from "obsidian";
 import { parseTask } from "./task";
 
 /** Called with the clicked task line; the editor resolves which note it is in. */
@@ -15,21 +16,23 @@ export type StartHandler = (view: EditorView, line: string) => void;
 class PlayWidget extends WidgetType {
 	constructor(
 		private readonly lineFrom: number,
+		private readonly time: string | null,
 		private readonly onStart: StartHandler,
 	) {
 		super();
 	}
 
 	eq(other: PlayWidget): boolean {
-		return other.lineFrom === this.lineFrom;
+		return other.lineFrom === this.lineFrom && other.time === this.time;
 	}
 
 	toDOM(view: EditorView): HTMLElement {
 		const button = createSpan({
 			cls: "toggl-tasks-start",
-			text: "▶",
 			attr: { "aria-label": "Start Toggl timer", role: "button" },
 		});
+		setIcon(button.createSpan({ cls: "toggl-tasks-start-icon" }), "play");
+		if (this.time) button.createSpan({ text: this.time });
 		// mousedown, not click: keeps the cursor where it is.
 		button.addEventListener("mousedown", (e) => {
 			e.preventDefault();
@@ -56,7 +59,10 @@ export function startButtons(onStart: StartHandler) {
 					builder.add(
 						line.to,
 						line.to,
-						Decoration.widget({ widget: new PlayWidget(line.from, onStart), side: 1 }),
+						Decoration.widget({
+							widget: new PlayWidget(line.from, task.time, onStart),
+							side: 1,
+						}),
 					);
 				}
 				pos = line.to + 1;

@@ -7,7 +7,7 @@ test("parseTask strips Tasks metadata, links, tags and the time field", () => {
 		parseTask(
 			"  - [ ] ➕ 2026-10-15  перейти на [[вебхук]]? #c/work ⏫ 📅 2026-10-20 🔁 every week",
 		),
-		{ description: "перейти на вебхук?", done: false, ref: null },
+		{ description: "перейти на вебхук?", done: false, ref: null, time: null },
 	);
 	assert.equal(
 		parseTask("- [ ] read [[books/Dont Make Me Think|the book]] [toggl:: 1:20] 🆔 abc123")
@@ -18,6 +18,7 @@ test("parseTask strips Tasks metadata, links, tags and the time field", () => {
 		description: "done",
 		done: true,
 		ref: null,
+		time: null,
 	});
 });
 
@@ -67,6 +68,7 @@ test("task reference is parsed, written before metadata and kept out of the desc
 		description: "write docs",
 		done: false,
 		ref: { projectId: 222884173, taskId: 244297522 },
+		time: "0:30",
 	});
 	// updating the time keeps the reference
 	assert.equal(parseTask(setTaskTime(line, 3600))?.ref?.taskId, 244297522);

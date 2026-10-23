@@ -1,13 +1,36 @@
+/* Pill next to an open task: play icon, plus the last synced time if any. */
 .toggl-tasks-start {
-	margin-left: 0.4em;
-	color: var(--text-faint);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3em;
+	margin-left: 0.5em;
+	padding: 0.1em 0.55em;
+	border: 1px solid color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+	border-radius: 100px;
+	background-color: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+	color: var(--interactive-accent);
+	font-size: var(--font-smallest);
+	font-variant-numeric: tabular-nums;
+	line-height: 1.4;
+	vertical-align: middle;
 	cursor: pointer;
-	font-size: 0.8em;
 	user-select: none;
+	transition:
+		background-color 0.15s ease-in-out,
+		border-color 0.15s ease-in-out;
 }
 
 .toggl-tasks-start:hover {
-	color: var(--interactive-accent);
+	background-color: color-mix(in srgb, var(--interactive-accent) 20%, transparent);
+	border-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+}
+
+/* svg is inline by default and reserves descender space; block centres it. */
+.toggl-tasks-start-icon svg {
+	display: block;
+	width: 1em;
+	height: 1em;
+	fill: currentColor;
 }
 
 .toggl-tasks-running {
