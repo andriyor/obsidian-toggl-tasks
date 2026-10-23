@@ -57,19 +57,19 @@ test("formatSeconds", () => {
 
 test("task reference is parsed, written before metadata and kept out of the description", () => {
 	const line = setTaskRef("- [ ] write docs [toggl:: 0:30] #work 📅 2026-10-20", {
-		projectId: 222884173,
-		taskId: 244297522,
+		projectId: 1234567,
+		taskId: 7654321,
 	});
 	assert.equal(
 		line,
-		"- [ ] write docs [toggl:: 0:30] [toggl_task:: 222884173/244297522] #work 📅 2026-10-20",
+		"- [ ] write docs [toggl:: 0:30] [toggl_task:: 1234567/7654321] #work 📅 2026-10-20",
 	);
 	assert.deepEqual(parseTask(line), {
 		description: "write docs",
 		done: false,
-		ref: { projectId: 222884173, taskId: 244297522 },
+		ref: { projectId: 1234567, taskId: 7654321 },
 		time: "0:30",
 	});
 	// updating the time keeps the reference
-	assert.equal(parseTask(setTaskTime(line, 3600))?.ref?.taskId, 244297522);
+	assert.equal(parseTask(setTaskTime(line, 3600))?.ref?.taskId, 7654321);
 });

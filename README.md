@@ -23,7 +23,7 @@ On the **first start** of a task:
 2. With a project, the plugin creates a **Toggl task** (Starter plan or higher) named after the task and writes its reference into the line:
 
    ```md
-   - [ ] write docs [toggl_task:: 222884173/244297613] 📅 2026-10-20
+   - [ ] write docs [toggl_task:: 1234567/7654321] 📅 2026-10-20
    ```
 
 Later starts reuse that reference and don't ask for anything.
@@ -35,7 +35,7 @@ Run **Update tracked time in current note**, or press **Sync note** in the sideb
 - each task's total as an inline field, before its Tasks metadata so Tasks still reads the dates:
 
   ```md
-  - [ ] write docs [toggl:: 1:15] [toggl_task:: 222884173/244297613] 📅 2026-10-20
+  - [ ] write docs [toggl:: 1:15] [toggl_task:: 1234567/7654321] 📅 2026-10-20
   ```
 
 - the sum for the note as the `toggl_hours` property, e.g. `toggl_hours: 3.5`
