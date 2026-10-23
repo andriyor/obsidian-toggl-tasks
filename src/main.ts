@@ -52,6 +52,7 @@ export default class TogglTasksPlugin extends Plugin {
 				new RunningTimerView(leaf, {
 					current: () => this.toggl.current(),
 					projectName: (id) => this.projectName(id),
+					syncNote: () => this.syncActiveNote(),
 				}),
 		);
 		this.addRibbonIcon(
@@ -147,6 +148,19 @@ export default class TogglTasksPlugin extends Plugin {
 
 	private async projectName(id: number): Promise<string | null> {
 		return (await this.loadProjects()).find((p) => p.id === id)?.name ?? null;
+	}
+
+	/**
+	 * Syncs the note last open in the editor. `getActiveFile` falls back to the
+	 * most recent file, so this works from the sidebar, which takes focus.
+	 */
+	private async syncActiveNote(): Promise<void> {
+		const file = this.app.workspace.getActiveFile();
+		if (file?.extension !== "md") {
+			new Notice("Toggl: open a note first");
+			return;
+		}
+		await this.syncNote(file);
 	}
 
 	private async showRunning(): Promise<void> {

@@ -8,6 +8,8 @@ const POLL_MS = 5 * 60_000;
 
 export interface RunningTimerSource {
 	current(): Promise<TimeEntry | null>;
+	/** Updates tracked time in the note last open in the editor. */
+	syncNote(): Promise<void>;
 	projectName(id: number): Promise<string | null>;
 }
 
@@ -98,8 +100,13 @@ export class RunningTimerView extends ItemView {
 				? `Error: ${this.error}`
 				: `Checked ${new Date(this.checkedAt).toLocaleTimeString()}`,
 		});
-		const button = footer.createEl("button", { text: "Refresh" });
-		button.addEventListener("click", () => void this.refresh());
+		const buttons = footer.createDiv({ cls: "toggl-tasks-running-buttons" });
+		buttons
+			.createEl("button", { text: "Sync note" })
+			.addEventListener("click", () => void this.source.syncNote());
+		buttons
+			.createEl("button", { text: "Refresh" })
+			.addEventListener("click", () => void this.refresh());
 	}
 
 	private tick(): void {

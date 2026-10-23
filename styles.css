@@ -61,3 +61,8 @@
 	margin-top: 0.6em;
 	font-size: var(--font-smallest);
 }
+
+.toggl-tasks-running-buttons {
+	display: flex;
+	gap: 0.4em;
+}
