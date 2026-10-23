@@ -19,7 +19,7 @@ Press the **▶** pill at the end of an open task (Live Preview and source mode)
 
 On the **first start** of a task:
 
-1. If the note has no `toggl_project`, you pick a project from the list. The choice is saved as the note's `toggl_project`, so other tasks in the note don't ask again. Esc starts the timer without a project and saves nothing.
+1. If the note has no `toggl_project`, you pick a project from the list. The choice is saved as the note's `toggl_project`, so other tasks in the note don't ask again. Esc starts the timer without a project and saves nothing; such a task has no Toggl task, so its time is not synced to the note.
 2. With a project, the plugin creates a **Toggl task** (Starter plan or higher) named after the task and writes its reference into the line:
 
    ```md
@@ -40,10 +40,7 @@ Run **Update tracked time in current note**, or press **Sync note** in the sideb
 
 - the sum for the note as the `toggl_hours` property, e.g. `toggl_hours: 3.5`
 
-How totals are read:
-
-- **Tasks with a Toggl task**: one request per project, all time. Renaming the task keeps its time.
-- **Tasks without one** (started with no project): one Reports API request per task, matched by exact description over the last 366 days. Renaming starts a new total, and the same text in two notes counts the same entries.
+Totals come from the tasks' Toggl tasks: one request per project, all time, and renaming a task keeps its time. Tasks without a Toggl task are left as they are.
 
 Totals under a minute are not written, and a running timer is counted only after it stops.
 

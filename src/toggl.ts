@@ -1,7 +1,6 @@
 import { requestUrl } from "obsidian";
 
 const API = "https://api.track.toggl.com/api/v9";
-const REPORTS = "https://api.track.toggl.com/reports/api/v3";
 
 /** A time entry as the v9 API returns it; running when `duration` is negative. */
 export interface TimeEntry {
@@ -14,11 +13,6 @@ export interface TimeEntry {
 interface ProjectTask {
 	id: number;
 	tracked_seconds: number;
-}
-
-interface DetailedRow {
-	description: string;
-	time_entries: { seconds: number }[];
 }
 
 export class Toggl {
@@ -105,43 +99,5 @@ export class Toggl {
 			headers: await this.headers(),
 		});
 		return (res.json as TimeEntry | null) ?? null;
-	}
-
-	/**
-	 * Fallback for tasks without a Toggl task (started without a project):
-	 * seconds tracked with exactly this description over the last 366 days.
-	 * The reports filter is a case-insensitive substring match, so rows are
-	 * compared exactly here. Running entries are not counted until stopped.
-	 */
-	// ponytail: 366 days is the Reports API maximum per request; walk earlier windows if older tasks matter
-	async trackedSeconds(description: string): Promise<number> {
-		const wid = await this.workspace();
-		const end = new Date();
-		const start = new Date(end.getTime() - 365 * 86_400_000);
-		const day = (d: Date) => d.toISOString().slice(0, 10);
-		let seconds = 0;
-		let firstRow: number | undefined;
-		do {
-			const res = await requestUrl({
-				url: `${REPORTS}/workspace/${wid}/search/time_entries`,
-				method: "POST",
-				headers: await this.headers(),
-				body: JSON.stringify({
-					start_date: day(start),
-					end_date: day(end),
-					description,
-					page_size: 50,
-					first_row_number: firstRow,
-				}),
-			});
-			for (const row of res.json as DetailedRow[]) {
-				if (row.description === description) {
-					for (const e of row.time_entries) seconds += e.seconds;
-				}
-			}
-			const next = res.headers["x-next-row-number"] ?? res.headers["X-Next-Row-Number"];
-			firstRow = next ? Number(next) : undefined;
-		} while (firstRow);
-		return seconds;
 	}
 }

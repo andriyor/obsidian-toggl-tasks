@@ -212,31 +212,22 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Writes `[toggl:: h:mm]` to each task and the sum to `toggl_hours`.
-	 * Tasks with a Toggl task cost one request per project; tasks without one
-	 * (started with no project) fall back to one Reports request each.
+	 * Writes `[toggl:: h:mm]` to each task with a Toggl task and the sum to
+	 * `toggl_hours`, with one request per project. Tasks started without a
+	 * project have no Toggl task and are left as they are.
 	 */
 	async syncNote(file: TFile): Promise<void> {
 		const tasks = (await this.app.vault.read(file))
 			.split("\n")
-			.map(parseTask)
-			.filter((t) => t?.description);
+			.flatMap((line) => parseTask(line)?.ref ?? []);
 		if (!tasks.length) {
-			new Notice("Toggl: no tasks in this note");
+			new Notice("Toggl: no tasks with a Toggl task in this note");
 			return;
 		}
 		const byTask = new Map<number, number>(); // Toggl task id → seconds
-		const byText = new Map<string, number>(); // description → seconds
 		try {
-			const projects = new Set(tasks.flatMap((t) => (t?.ref ? [t.ref.projectId] : [])));
-			for (const pid of projects) {
+			for (const pid of new Set(tasks.map((t) => t.projectId))) {
 				for (const [id, s] of await this.toggl.projectTaskSeconds(pid)) byTask.set(id, s);
-			}
-			// Sequential: the Reports API allows a few hundred requests per hour.
-			for (const t of tasks) {
-				if (t && !t.ref && !byText.has(t.description)) {
-					byText.set(t.description, await this.toggl.trackedSeconds(t.description));
-				}
 			}
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -248,9 +239,8 @@ export default class TogglTasksPlugin extends Plugin {
 			text
 				.split("\n")
 				.map((line) => {
-					const t = parseTask(line);
-					if (!t?.description) return line;
-					const s = t.ref ? byTask.get(t.ref.taskId) : byText.get(t.description);
+					const ref = parseTask(line)?.ref;
+					const s = ref ? byTask.get(ref.taskId) : undefined;
 					if (s === undefined) return line;
 					total += s;
 					return setTaskTime(line, s);
