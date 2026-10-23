@@ -2,7 +2,7 @@
 
 Obsidian plugin that starts [Toggl Track](https://toggl.com/track/) timers from task lines and writes the tracked time back into the note.
 
-Toggl stays the source of truth: timers are stopped in Toggl (app, web, Lock Screen), and the plugin reads the totals back from the Toggl API.
+Toggl stays the source of truth: timers are stopped in the Toggl apps, and the plugin reads the totals back from the Toggl API.
 
 Desktop only.
 
@@ -58,6 +58,18 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 | API token     | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.          |
 | Projects file | Vault path of a JSON file `{ "project name": id }`                                                              |
 | Tags URL      | Optional. Returns `[{ "id": 123 }, …]`. Self-signed HTTPS certificates are accepted, so it can be a LAN server. |
+
+## Design decisions
+
+- **Toggl is the source of truth, nothing is tracked locally.** Timers are often stopped outside Obsidian, in the Toggl apps, so a local timer would drift. This is also why this is not a fork of [Task Time Tracker](https://github.com/Mythanar/obsidian-task-time-tracker): it stores time locally and by design never calls an external API, and its codebase is large and changing its storage format.
+- **Toggl tasks instead of matching by text.** Matching entries to tasks by description needs a Reports API request per task, is limited to 366 days per request, and breaks when a task is renamed. A Toggl task gives an id to store in the line and an all-time `tracked_seconds`, read for a whole project in one request. Tasks started without a project are therefore not synced.
+- **The line stores both project and task id.** Toggl rejects a time entry with only `task_id` ("task needs to be in the same project as the time entry"), so `[toggl_task:: project/task]` keeps both and later starts need no lookup.
+- **`tracked_seconds` is in milliseconds.** Despite the name, a 60 s entry reports `60000`; the plugin divides by 1000.
+- **Inline fields go before Tasks metadata.** The Tasks plugin only parses emoji fields at the end of the line; appending `[toggl:: …]` after `📅 …` would turn the dates into description text.
+- **Projects come from a hand-kept JSON file.** Projects rarely change, and a local name → id map avoids an API call per start. `GET /me/projects` returns all of them unpaginated, unlike `/workspaces/{id}/projects`, which cuts off at the first page. A picked project is saved per note as `toggl_project`.
+- **Token in `.env`, not in plugin settings.** Plugin `data.json` can end up in git when a vault is versioned; `.env` stays out of it and can be shared with other Toggl scripts. Obsidian's secret storage is a todo.
+- **Running timer polls rarely.** `/me` requests are capped at 30 per hour per user across all Toggl clients, so the view polls every 5 minutes, only when visible and focused, and shows a just-started timer from the start response.
+- **Tags go through Node `https`.** The tags URL may be a LAN server with a self-signed certificate, which Obsidian's `requestUrl` rejects; this is what makes the plugin desktop only.
 
 ## Todo
 
