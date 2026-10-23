@@ -6,7 +6,17 @@ Toggl stays the source of truth: timers are stopped in the Toggl apps, and the p
 
 Desktop only.
 
+## Setup
+
+| Setting       | Description                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| API token     | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.          |
+| Projects file | Vault path of a JSON file `{ "project name": id }`                                                              |
+| Tags URL      | Optional. Returns `[{ "id": 123 }, …]`. Self-signed HTTPS certificates are accepted, so it can be a LAN server. |
+
 ## Start a timer
+
+### For a task
 
 Press the **▶** pill at the end of an open task (Live Preview and source mode), or run **Start timer for task on current line**.
 
@@ -28,7 +38,9 @@ On the **first start** of a task:
 
 Later starts reuse that reference and don't ask for anything.
 
-To track time on a note rather than a task, press **Start note** in the running timer view or run **Start timer for current note**. It starts a timer in the note's project (picked and saved the same way) with the note title as description, without a Toggl task, so this time is not synced into the note.
+### For a whole note
+
+Press **Start note** in the running timer view or run **Start timer for current note**. It starts a timer in the note's project (picked and saved the same way) with the note title as description, without a Toggl task, so this time is not synced into the note.
 
 ## Tracked time
 
@@ -53,14 +65,6 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 - A timer started with ▶ shows up immediately.
 - Otherwise the view polls `/me/time_entries/current` every 5 minutes, only while it is visible and Obsidian is focused: `/me` requests are limited to 30 per hour per user. A timer stopped in the Toggl app can take up to 5 minutes to disappear, or press **Refresh**.
 
-## Settings
-
-| Setting       | Description                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| API token     | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.          |
-| Projects file | Vault path of a JSON file `{ "project name": id }`                                                              |
-| Tags URL      | Optional. Returns `[{ "id": 123 }, …]`. Self-signed HTTPS certificates are accepted, so it can be a LAN server. |
-
 ## Design decisions
 
 - **Toggl is the source of truth, nothing is tracked locally.** Timers are often stopped outside Obsidian, in the Toggl apps, so a local timer would drift. This is also why this is not a fork of [Task Time Tracker](https://github.com/Mythanar/obsidian-task-time-tracker): it stores time locally and by design never calls an external API, and its codebase is large and changing its storage format.
@@ -73,11 +77,6 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 - **Running timer polls rarely.** `/me` requests are capped at 30 per hour per user across all Toggl clients, so the view polls every 5 minutes, only when visible and focused, and shows a just-started timer from the start response.
 - **Tags go through Node `https`.** The tags URL may be a LAN server with a self-signed certificate, which Obsidian's `requestUrl` rejects; this is what makes the plugin desktop only.
 
-## Todo
-
-- [ ] Optional token from Obsidian's secret storage (`SecretComponent` + `app.secretStorage`, Obsidian 1.11.4+), for vaults without a `.env`
-- [ ] Running timer from the [toggl-lock](https://github.com/andriyor/toggl-lock) server instead of the Toggl API: its webhook-fed `state.display` (`{ message, project, startedAt }`) is current within seconds and polling it costs no Toggl quota. Needs a narrow `GET /display` route there (today only `GET /state`, which also exposes push tokens) and a URL + `APP_SECRET` setting here.
-
 ## Development
 
 ```sh
@@ -86,3 +85,8 @@ pnpm dev     # watch build
 pnpm test
 pnpm lint
 ```
+
+## Todo
+
+- [ ] Optional token from Obsidian's secret storage (`SecretComponent` + `app.secretStorage`, Obsidian 1.11.4+), for vaults without a `.env`
+- [ ] Running timer from the [toggl-lock](https://github.com/andriyor/toggl-lock) server instead of the Toggl API: its webhook-fed `state.display` (`{ message, project, startedAt }`) is current within seconds and polling it costs no Toggl quota. Needs a narrow `GET /display` route there (today only `GET /state`, which also exposes push tokens) and a URL + `APP_SECRET` setting here.
