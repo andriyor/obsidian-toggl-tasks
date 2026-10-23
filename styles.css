@@ -1,0 +1,11 @@
+.toggl-tasks-start {
+	margin-left: 0.4em;
+	color: var(--text-faint);
+	cursor: pointer;
+	font-size: 0.8em;
+	user-select: none;
+}
+
+.toggl-tasks-start:hover {
+	color: var(--interactive-accent);
+}
