@@ -7,7 +7,6 @@ import {
 	Notice,
 	Plugin,
 	PluginSettingTab,
-	SecretComponent,
 	Setting,
 	TFile,
 } from "obsidian";
@@ -16,21 +15,22 @@ import { fetchTagIds } from "./tags";
 import { formatSeconds, parseTask, setTaskTime } from "./task";
 import { Toggl } from "./toggl";
 
+/** Vault-root file with `TOGGL_API_TOKEN=...`; keep it out of git. */
+const ENV_FILE = ".env";
+const TOKEN_RE = /^TOGGL_API_TOKEN=["']?([^"'\n]+)/m;
 /** Note property naming the Toggl project for its tasks. */
 const PROJECT_PROPERTY = "toggl_project";
 /** Note property with the sum of tracked time of its tasks, in hours. */
 const HOURS_PROPERTY = "toggl_hours";
 
 interface Settings {
-	/** Name of the secret in Obsidian's secret storage holding the API token. */
-	tokenSecret: string;
 	/** Vault path of a `{ "project name": id }` JSON file. */
 	projectsPath: string;
 	/** URL returning `[{ id }]` of tags to attach to every new timer. */
 	tagsUrl: string;
 }
 
-const DEFAULT_SETTINGS: Settings = { tokenSecret: "", projectsPath: "", tagsUrl: "" };
+const DEFAULT_SETTINGS: Settings = { projectsPath: "", tagsUrl: "" };
 
 interface Project {
 	name: string;
@@ -39,11 +39,7 @@ interface Project {
 
 export default class TogglTasksPlugin extends Plugin {
 	settings: Settings = DEFAULT_SETTINGS;
-	private toggl = new Toggl(() =>
-		this.settings.tokenSecret
-			? this.app.secretStorage.getSecret(this.settings.tokenSecret)
-			: null,
-	);
+	private toggl = new Toggl(() => this.readToken());
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -158,6 +154,13 @@ export default class TogglTasksPlugin extends Plugin {
 		new Notice(`Toggl: ${descriptions.size} tasks, ${formatSeconds(total)} total`);
 	}
 
+	/** `TOGGL_API_TOKEN` from the vault's `.env`, shared with the vault scripts. */
+	private async readToken(): Promise<string | null> {
+		if (!(await this.app.vault.adapter.exists(ENV_FILE))) return null;
+		const env = await this.app.vault.adapter.read(ENV_FILE);
+		return TOKEN_RE.exec(env)?.[1].trim() ?? null;
+	}
+
 	async loadSettings(): Promise<void> {
 		this.settings = {
 			...DEFAULT_SETTINGS,
@@ -220,15 +223,7 @@ class TogglTasksSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("API token")
-			.setDesc("Toggl Track API token, from Profile settings in Toggl.")
-			.addComponent((el) =>
-				new SecretComponent(this.app, el)
-					.setValue(this.plugin.settings.tokenSecret)
-					.onChange(async (value) => {
-						this.plugin.settings.tokenSecret = value ?? "";
-						await this.plugin.saveSettings();
-					}),
-			);
+			.setDesc(`Read from TOGGL_API_TOKEN in ${ENV_FILE} at the vault root.`);
 
 		new Setting(containerEl)
 			.setName("Projects file")

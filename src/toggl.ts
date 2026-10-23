@@ -11,11 +11,11 @@ interface DetailedRow {
 export class Toggl {
 	private workspaceId: number | null = null;
 
-	constructor(private readonly token: () => string | null) {}
+	constructor(private readonly token: () => Promise<string | null>) {}
 
-	private headers(): Record<string, string> {
-		const token = this.token();
-		if (!token) throw new Error("Toggl API token is not set");
+	private async headers(): Promise<Record<string, string>> {
+		const token = await this.token();
+		if (!token) throw new Error("TOGGL_API_TOKEN is not set in .env");
 		return {
 			Authorization: "Basic " + btoa(`${token}:api_token`),
 			"Content-Type": "application/json",
@@ -24,7 +24,7 @@ export class Toggl {
 
 	private async workspace(): Promise<number> {
 		if (this.workspaceId === null) {
-			const me = await requestUrl({ url: `${API}/me`, headers: this.headers() });
+			const me = await requestUrl({ url: `${API}/me`, headers: await this.headers() });
 			this.workspaceId = (
 				me.json as { default_workspace_id: number }
 			).default_workspace_id;
@@ -41,7 +41,7 @@ export class Toggl {
 		await requestUrl({
 			url: `${API}/workspaces/${wid}/time_entries`,
 			method: "POST",
-			headers: this.headers(),
+			headers: await this.headers(),
 			body: JSON.stringify({
 				created_with: "obsidian-toggl-tasks",
 				workspace_id: wid,
@@ -71,7 +71,7 @@ export class Toggl {
 			const res = await requestUrl({
 				url: `${REPORTS}/workspace/${wid}/search/time_entries`,
 				method: "POST",
-				headers: this.headers(),
+				headers: await this.headers(),
 				body: JSON.stringify({
 					start_date: day(start),
 					end_date: day(end),

@@ -16,11 +16,15 @@ Tasks are matched to Toggl entries by exact description, so renaming a task star
 
 ## Settings
 
-- **API token**: stored in Obsidian's secret storage, not in `data.json`.
+- **API token**: not a setting; read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.
 - **Projects file**: vault path of a JSON file `{ "project name": id }`.
 - **Tags URL**: optional, returns `[{ "id": 123 }, …]`. Self-signed HTTPS certificates are accepted, so it can be a LAN server.
 
 Desktop only (the tags request uses Node's `https`).
+
+## Todo
+
+- [ ] Optional token from Obsidian's secret storage (`SecretComponent` + `app.secretStorage`, Obsidian 1.11.4+), for vaults without a `.env`
 
 ## Development
 
