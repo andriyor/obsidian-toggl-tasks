@@ -14,6 +14,7 @@ import { startButtons } from "./button";
 import { fetchTagIds } from "./tags";
 import { formatSeconds, parseTask, setTaskTime } from "./task";
 import { Toggl } from "./toggl";
+import { RunningTimerView, VIEW_TYPE_RUNNING } from "./view";
 
 /** Vault-root file with `TOGGL_API_TOKEN=...`; keep it out of git. */
 const ENV_FILE = ".env";
@@ -44,6 +45,26 @@ export default class TogglTasksPlugin extends Plugin {
 	async onload(): Promise<void> {
 		await this.loadSettings();
 		this.addSettingTab(new TogglTasksSettingTab(this.app, this));
+
+		this.registerView(
+			VIEW_TYPE_RUNNING,
+			(leaf) =>
+				new RunningTimerView(leaf, {
+					current: () => this.toggl.current(),
+					projectName: async (id) =>
+						(await this.loadProjects()).find((p) => p.id === id)?.name ?? null,
+				}),
+		);
+		this.addRibbonIcon(
+			"timer",
+			"Show running Toggl timer",
+			() => void this.showRunning(),
+		);
+		this.addCommand({
+			id: "show-running",
+			name: "Show running timer",
+			callback: () => void this.showRunning(),
+		});
 
 		this.registerEditorExtension(
 			startButtons((view: EditorView, line: string) => {
@@ -80,13 +101,25 @@ export default class TogglTasksPlugin extends Plugin {
 		try {
 			const project = await this.pickProject(file);
 			const tagIds = await fetchTagIds(this.settings.tagsUrl);
-			await this.toggl.start(task.description, project?.id ?? null, tagIds);
+			const entry = await this.toggl.start(task.description, project?.id ?? null, tagIds);
+			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
+				if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
+			}
 			new Notice(
 				`Toggl started: ${task.description} [${project?.name ?? "no project"}] (${tagIds.length} tags)`,
 			);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
+	}
+
+	private async showRunning(): Promise<void> {
+		const { workspace } = this.app;
+		const leaf =
+			workspace.getLeavesOfType(VIEW_TYPE_RUNNING)[0] ?? workspace.getRightLeaf(false);
+		if (!leaf) return;
+		await leaf.setViewState({ type: VIEW_TYPE_RUNNING, active: true });
+		await workspace.revealLeaf(leaf);
 	}
 
 	/** The note's `toggl_project`, else a choice from the projects file (Esc = none). */

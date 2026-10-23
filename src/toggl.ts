@@ -3,6 +3,14 @@ import { requestUrl } from "obsidian";
 const API = "https://api.track.toggl.com/api/v9";
 const REPORTS = "https://api.track.toggl.com/reports/api/v3";
 
+/** A time entry as the v9 API returns it; running when `duration` is negative. */
+export interface TimeEntry {
+	description: string | null;
+	project_id: number | null;
+	start: string;
+	duration: number;
+}
+
 interface DetailedRow {
 	description: string;
 	time_entries: { seconds: number }[];
@@ -36,9 +44,9 @@ export class Toggl {
 		description: string,
 		projectId: number | null,
 		tagIds: number[],
-	): Promise<void> {
+	): Promise<TimeEntry> {
 		const wid = await this.workspace();
-		await requestUrl({
+		const res = await requestUrl({
 			url: `${API}/workspaces/${wid}/time_entries`,
 			method: "POST",
 			headers: await this.headers(),
@@ -52,6 +60,16 @@ export class Toggl {
 				duration: -1,
 			}),
 		});
+		return res.json as TimeEntry;
+	}
+
+	/** The running entry, or null. A `/me` request: 30 per hour per user on every plan. */
+	async current(): Promise<TimeEntry | null> {
+		const res = await requestUrl({
+			url: `${API}/me/time_entries/current`,
+			headers: await this.headers(),
+		});
+		return (res.json as TimeEntry | null) ?? null;
 	}
 
 	/**

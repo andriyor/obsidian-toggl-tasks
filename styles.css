@@ -9,3 +9,32 @@
 .toggl-tasks-start:hover {
 	color: var(--interactive-accent);
 }
+
+.toggl-tasks-running {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4em;
+}
+
+.toggl-tasks-running-description {
+	font-weight: var(--font-semibold);
+}
+
+.toggl-tasks-running-project,
+.toggl-tasks-running-empty,
+.toggl-tasks-running-footer {
+	color: var(--text-muted);
+}
+
+.toggl-tasks-running-elapsed {
+	font-size: 1.6em;
+	font-variant-numeric: tabular-nums;
+}
+
+.toggl-tasks-running-footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-top: 0.6em;
+	font-size: var(--font-smallest);
+}

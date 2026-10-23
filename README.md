@@ -11,6 +11,7 @@ Obsidian plugin that starts a [Toggl Track](https://toggl.com/track/) timer from
 - **Update tracked time in current note** sums Toggl time per task over the last 366 days and writes it:
   - to the task as an inline field before its Tasks metadata: `- [ ] write docs [toggl:: 1:15] 📅 2026-10-20`
   - to the note as `toggl_hours: 3.5`
+- **Running timer in the sidebar**: ribbon icon or **Show running timer**. Shows the description, project and elapsed time. It polls `/me/time_entries/current` every 5 minutes, only while the view is visible and Obsidian is focused, because `/me` requests are limited to 30 per hour per user. A timer started with ▶ shows up immediately; one stopped in the Toggl app can take up to 5 minutes, or press Refresh.
 
 Tasks are matched to Toggl entries by exact description, so renaming a task starts a new total. The same task text in two notes counts the same entries in both.
 
@@ -25,6 +26,7 @@ Desktop only (the tags request uses Node's `https`).
 ## Todo
 
 - [ ] Optional token from Obsidian's secret storage (`SecretComponent` + `app.secretStorage`, Obsidian 1.11.4+), for vaults without a `.env`
+- [ ] Running timer from the [toggl-lock](https://github.com/andriyor/toggl-lock) server instead of the Toggl API: its webhook-fed `state.display` (`{ message, project, startedAt }`) is current within seconds and polling it costs no Toggl quota. Needs a narrow `GET /display` route there (today only `GET /state`, which also exposes push tokens) and a URL + `APP_SECRET` setting here.
 
 ## Development
 
