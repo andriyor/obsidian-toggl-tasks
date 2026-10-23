@@ -2,8 +2,11 @@
 // same text must come out both when a timer starts and when time is synced.
 
 const TASK_RE = /^\s*[-*+] \[(.)\] (.*)$/;
+/** Inline fields this plugin writes: tracked time and the Toggl task reference. */
 const TIME_FIELD = "toggl";
-const TIME_FIELD_RE = /\s*\[toggl:: [^\]]*\]/gu;
+const REF_FIELD = "toggl_task";
+const OWN_FIELDS_RE = /\s*\[toggl(?:_task)?:: [^\]]*\]/gu;
+const REF_RE = /\[toggl_task:: (\d+)\/(\d+)\]/u;
 
 // Tasks plugin metadata (emoji format).
 const META_RE = new RegExp(
@@ -22,22 +25,34 @@ const TRAILING_META_RE = new RegExp(`(?:\\s+(?:${META_RE.source}))+\\s*$`, "u");
 
 const DONE_STATUSES = new Set(["x", "X", "-"]);
 
+/** A Toggl task; time entries for it need both ids. */
+export interface TaskRef {
+	projectId: number;
+	taskId: number;
+}
+
 export interface Task {
-	/** Toggl description: task text without metadata, links or the time field. */
+	/** Toggl description: task text without metadata, links or this plugin's fields. */
 	description: string;
 	done: boolean;
+	ref: TaskRef | null;
 }
 
 export function parseTask(line: string): Task | null {
 	const m = TASK_RE.exec(line);
 	if (!m) return null;
 	const description = m[2]
-		.replace(TIME_FIELD_RE, "")
+		.replace(OWN_FIELDS_RE, "")
 		.replace(META_RE, "")
 		.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/gu, "$1") // [[note|alias]] → alias
 		.replace(/\s+/g, " ")
 		.trim();
-	return { description, done: DONE_STATUSES.has(m[1]) };
+	const ref = REF_RE.exec(m[2]);
+	return {
+		description,
+		done: DONE_STATUSES.has(m[1]),
+		ref: ref ? { projectId: Number(ref[1]), taskId: Number(ref[2]) } : null,
+	};
 }
 
 /** `h:mm`, e.g. 4500 → "1:15". */
@@ -48,9 +63,19 @@ export function formatSeconds(seconds: number): string {
 
 /** Writes `[toggl:: h:mm]` into a task line, or removes it when under a minute. */
 export function setTaskTime(line: string, seconds: number): string {
-	const bare = line.replace(TIME_FIELD_RE, "");
-	if (seconds < 60) return bare;
-	const field = ` [${TIME_FIELD}:: ${formatSeconds(seconds)}]`;
+	return setField(line, TIME_FIELD, seconds < 60 ? null : formatSeconds(seconds));
+}
+
+/** Writes `[toggl_task:: project/task]` into a task line. */
+export function setTaskRef(line: string, ref: TaskRef): string {
+	return setField(line, REF_FIELD, `${ref.projectId}/${ref.taskId}`);
+}
+
+/** Replaces or removes `[name:: value]`, keeping it before trailing Tasks metadata. */
+function setField(line: string, name: string, value: string | null): string {
+	const bare = line.replace(new RegExp(`\\s*\\[${name}:: [^\\]]*\\]`, "gu"), "");
+	if (value === null) return bare;
+	const field = ` [${name}:: ${value}]`;
 	const meta = TRAILING_META_RE.exec(bare);
 	return meta ? bare.slice(0, meta.index) + field + bare.slice(meta.index) : bare + field;
 }

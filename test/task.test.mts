@@ -1,13 +1,13 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { formatSeconds, parseTask, setTaskTime } from "../src/task.ts";
+import { formatSeconds, parseTask, setTaskRef, setTaskTime } from "../src/task.ts";
 
 test("parseTask strips Tasks metadata, links, tags and the time field", () => {
 	assert.deepEqual(
 		parseTask(
 			"  - [ ] ➕ 2026-10-15  перейти на [[вебхук]]? #c/work ⏫ 📅 2026-10-20 🔁 every week",
 		),
-		{ description: "перейти на вебхук?", done: false },
+		{ description: "перейти на вебхук?", done: false, ref: null },
 	);
 	assert.equal(
 		parseTask("- [ ] read [[books/Dont Make Me Think|the book]] [toggl:: 1:20] 🆔 abc123")
@@ -17,6 +17,7 @@ test("parseTask strips Tasks metadata, links, tags and the time field", () => {
 	assert.deepEqual(parseTask("- [x] done ✅ 2026-10-19"), {
 		description: "done",
 		done: true,
+		ref: null,
 	});
 });
 
@@ -51,4 +52,22 @@ test("formatSeconds", () => {
 	assert.equal(formatSeconds(0), "0:00");
 	assert.equal(formatSeconds(3599), "0:59");
 	assert.equal(formatSeconds(36000), "10:00");
+});
+
+test("task reference is parsed, written before metadata and kept out of the description", () => {
+	const line = setTaskRef("- [ ] write docs [toggl:: 0:30] #work 📅 2026-10-20", {
+		projectId: 222884173,
+		taskId: 244297522,
+	});
+	assert.equal(
+		line,
+		"- [ ] write docs [toggl:: 0:30] [toggl_task:: 222884173/244297522] #work 📅 2026-10-20",
+	);
+	assert.deepEqual(parseTask(line), {
+		description: "write docs",
+		done: false,
+		ref: { projectId: 222884173, taskId: 244297522 },
+	});
+	// updating the time keeps the reference
+	assert.equal(parseTask(setTaskTime(line, 3600))?.ref?.taskId, 244297522);
 });

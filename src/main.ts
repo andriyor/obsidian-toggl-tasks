@@ -12,7 +12,7 @@ import {
 } from "obsidian";
 import { startButtons } from "./button";
 import { fetchTagIds } from "./tags";
-import { formatSeconds, parseTask, setTaskTime } from "./task";
+import { formatSeconds, parseTask, setTaskRef, setTaskTime, TaskRef } from "./task";
 import { Toggl } from "./toggl";
 import { RunningTimerView, VIEW_TYPE_RUNNING } from "./view";
 
@@ -51,8 +51,7 @@ export default class TogglTasksPlugin extends Plugin {
 			(leaf) =>
 				new RunningTimerView(leaf, {
 					current: () => this.toggl.current(),
-					projectName: async (id) =>
-						(await this.loadProjects()).find((p) => p.id === id)?.name ?? null,
+					projectName: (id) => this.projectName(id),
 				}),
 		);
 		this.addRibbonIcon(
@@ -92,6 +91,11 @@ export default class TogglTasksPlugin extends Plugin {
 		});
 	}
 
+	/**
+	 * Starts a timer for a task line. The first start in a project creates a
+	 * Toggl task and writes `[toggl_task:: project/task]` into the line, so
+	 * later starts and syncs go by id instead of by text.
+	 */
 	async startTimer(line: string, file: TFile | null): Promise<void> {
 		const task = parseTask(line);
 		if (!task?.description) {
@@ -99,18 +103,50 @@ export default class TogglTasksPlugin extends Plugin {
 			return;
 		}
 		try {
-			const project = await this.pickProject(file);
+			let ref = task.ref;
+			let projectName: string | null = null;
+			if (!ref) {
+				const project = await this.pickProject(file);
+				if (project) {
+					ref = {
+						projectId: project.id,
+						taskId: await this.toggl.createTask(project.id, task.description),
+					};
+					if (file) await this.writeRef(file, line, ref);
+					projectName = project.name;
+				}
+			}
 			const tagIds = await fetchTagIds(this.settings.tagsUrl);
-			const entry = await this.toggl.start(task.description, project?.id ?? null, tagIds);
+			const entry = await this.toggl.start(
+				task.description,
+				ref?.projectId ?? null,
+				tagIds,
+				ref?.taskId ?? null,
+			);
 			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
 				if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
 			}
+			projectName ??= ref ? await this.projectName(ref.projectId) : null;
 			new Notice(
-				`Toggl started: ${task.description} [${project?.name ?? "no project"}] (${tagIds.length} tags)`,
+				`Toggl started: ${task.description} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
 			);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
+	}
+
+	/** Adds the Toggl task reference to the first line equal to `line`. */
+	private async writeRef(file: TFile, line: string, ref: TaskRef): Promise<void> {
+		await this.app.vault.process(file, (text) => {
+			const lines = text.split("\n");
+			const i = lines.indexOf(line);
+			if (i >= 0) lines[i] = setTaskRef(line, ref);
+			return lines.join("\n");
+		});
+	}
+
+	private async projectName(id: number): Promise<string | null> {
+		return (await this.loadProjects()).find((p) => p.id === id)?.name ?? null;
 	}
 
 	private async showRunning(): Promise<void> {
@@ -147,21 +183,33 @@ export default class TogglTasksPlugin extends Plugin {
 		return Object.entries(map).map(([name, id]) => ({ name, id }));
 	}
 
-	/** Writes `[toggl:: h:mm]` to each task and the sum to `toggl_hours`. */
+	/**
+	 * Writes `[toggl:: h:mm]` to each task and the sum to `toggl_hours`.
+	 * Tasks with a Toggl task cost one request per project; tasks without one
+	 * (started with no project) fall back to one Reports request each.
+	 */
 	async syncNote(file: TFile): Promise<void> {
-		const descriptions = new Set<string>();
-		for (const line of (await this.app.vault.read(file)).split("\n")) {
-			const description = parseTask(line)?.description;
-			if (description) descriptions.add(description);
-		}
-		if (!descriptions.size) {
+		const tasks = (await this.app.vault.read(file))
+			.split("\n")
+			.map(parseTask)
+			.filter((t) => t?.description);
+		if (!tasks.length) {
 			new Notice("Toggl: no tasks in this note");
 			return;
 		}
-		const seconds = new Map<string, number>();
+		const byTask = new Map<number, number>(); // Toggl task id → seconds
+		const byText = new Map<string, number>(); // description → seconds
 		try {
+			const projects = new Set(tasks.flatMap((t) => (t?.ref ? [t.ref.projectId] : [])));
+			for (const pid of projects) {
+				for (const [id, s] of await this.toggl.projectTaskSeconds(pid)) byTask.set(id, s);
+			}
 			// Sequential: the Reports API allows a few hundred requests per hour.
-			for (const d of descriptions) seconds.set(d, await this.toggl.trackedSeconds(d));
+			for (const t of tasks) {
+				if (t && !t.ref && !byText.has(t.description)) {
+					byText.set(t.description, await this.toggl.trackedSeconds(t.description));
+				}
+			}
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 			return;
@@ -172,9 +220,10 @@ export default class TogglTasksPlugin extends Plugin {
 			text
 				.split("\n")
 				.map((line) => {
-					const description = parseTask(line)?.description;
-					if (!description || !seconds.has(description)) return line;
-					const s = seconds.get(description) ?? 0;
+					const t = parseTask(line);
+					if (!t?.description) return line;
+					const s = t.ref ? byTask.get(t.ref.taskId) : byText.get(t.description);
+					if (s === undefined) return line;
 					total += s;
 					return setTaskTime(line, s);
 				})
@@ -184,7 +233,7 @@ export default class TogglTasksPlugin extends Plugin {
 			if (total >= 60) fm[HOURS_PROPERTY] = Math.round((total / 3600) * 100) / 100;
 			else delete fm[HOURS_PROPERTY];
 		});
-		new Notice(`Toggl: ${descriptions.size} tasks, ${formatSeconds(total)} total`);
+		new Notice(`Toggl: ${tasks.length} tasks, ${formatSeconds(total)} total`);
 	}
 
 	/** `TOGGL_API_TOKEN` from the vault's `.env`, shared with the vault scripts. */

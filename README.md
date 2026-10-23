@@ -8,12 +8,14 @@ Obsidian plugin that starts a [Toggl Track](https://toggl.com/track/) timer from
   - Description: the task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets.
   - Project: the note's `toggl_project` property, looked up by name in the projects file. Without it you pick one from the list, or press Esc for no project.
   - Tags: ids returned by the optional tags URL.
-- **Update tracked time in current note** sums Toggl time per task over the last 366 days and writes it:
+  - With a project, the first start creates a **Toggl task** (Starter plan or higher) named after the task and writes its reference into the line: `[toggl_task:: <project id>/<task id>]`. Later starts reuse it without asking for the project.
+- **Update tracked time in current note** reads each task's total from Toggl and writes it:
   - to the task as an inline field before its Tasks metadata: `- [ ] write docs [toggl:: 1:15] 📅 2026-10-20`
   - to the note as `toggl_hours: 3.5`
+  - Tasks with a Toggl task cost one request per project and count all time. Tasks started without a project fall back to one Reports API request each, matched by exact description over the last 366 days.
 - **Running timer in the sidebar**: ribbon icon or **Show running timer**. Shows the description, project and elapsed time. It polls `/me/time_entries/current` every 5 minutes, only while the view is visible and Obsidian is focused, because `/me` requests are limited to 30 per hour per user. A timer started with ▶ shows up immediately; one stopped in the Toggl app can take up to 5 minutes, or press Refresh.
 
-Tasks are matched to Toggl entries by exact description, so renaming a task starts a new total. The same task text in two notes counts the same entries in both.
+Renaming a task keeps its time when it has a Toggl task. Without one, it is matched by text, so renaming starts a new total and the same text in two notes counts the same entries in both.
 
 ## Settings
 

@@ -11,6 +11,11 @@ export interface TimeEntry {
 	duration: number;
 }
 
+interface ProjectTask {
+	id: number;
+	tracked_seconds: number;
+}
+
 interface DetailedRow {
 	description: string;
 	time_entries: { seconds: number }[];
@@ -44,6 +49,7 @@ export class Toggl {
 		description: string,
 		projectId: number | null,
 		tagIds: number[],
+		taskId: number | null = null,
 	): Promise<TimeEntry> {
 		const wid = await this.workspace();
 		const res = await requestUrl({
@@ -55,12 +61,41 @@ export class Toggl {
 				workspace_id: wid,
 				description,
 				project_id: projectId ?? undefined,
+				task_id: taskId ?? undefined,
 				tag_ids: tagIds,
 				start: new Date().toISOString(),
 				duration: -1,
 			}),
 		});
 		return res.json as TimeEntry;
+	}
+
+	/** Creates a Toggl task (paid plans) in a project; returns its id. */
+	async createTask(projectId: number, name: string): Promise<number> {
+		const wid = await this.workspace();
+		const res = await requestUrl({
+			url: `${API}/workspaces/${wid}/projects/${projectId}/tasks`,
+			method: "POST",
+			headers: await this.headers(),
+			body: JSON.stringify({ name }),
+		});
+		return (res.json as { id: number }).id;
+	}
+
+	/**
+	 * All-time seconds per task id for one project, in a single request.
+	 * Running entries are not counted until stopped.
+	 */
+	async projectTaskSeconds(projectId: number): Promise<Map<number, number>> {
+		const wid = await this.workspace();
+		const res = await requestUrl({
+			url: `${API}/workspaces/${wid}/projects/${projectId}/tasks`,
+			headers: await this.headers(),
+		});
+		const body = res.json as ProjectTask[] | { items: ProjectTask[] } | null;
+		const tasks = Array.isArray(body) ? body : (body?.items ?? []);
+		// tracked_seconds is in milliseconds despite its name (60 s entry → 60000).
+		return new Map(tasks.map((t) => [t.id, Math.round(t.tracked_seconds / 1000)]));
 	}
 
 	/** The running entry, or null. A `/me` request: 30 per hour per user on every plan. */
@@ -73,7 +108,8 @@ export class Toggl {
 	}
 
 	/**
-	 * Seconds tracked with exactly this description over the last 366 days.
+	 * Fallback for tasks without a Toggl task (started without a project):
+	 * seconds tracked with exactly this description over the last 366 days.
 	 * The reports filter is a case-insensitive substring match, so rows are
 	 * compared exactly here. Running entries are not counted until stopped.
 	 */
