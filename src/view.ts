@@ -10,6 +10,8 @@ export interface RunningTimerSource {
 	current(): Promise<TimeEntry | null>;
 	/** Updates tracked time in the note last open in the editor. */
 	syncNote(): Promise<void>;
+	/** Starts a project timer for the note last open in the editor. */
+	startNote(): Promise<void>;
 	projectName(id: number): Promise<string | null>;
 }
 
@@ -101,6 +103,9 @@ export class RunningTimerView extends ItemView {
 				: `Checked ${new Date(this.checkedAt).toLocaleTimeString()}`,
 		});
 		const buttons = footer.createDiv({ cls: "toggl-tasks-running-buttons" });
+		buttons
+			.createEl("button", { text: "Start note" })
+			.addEventListener("click", () => void this.source.startNote());
 		buttons
 			.createEl("button", { text: "Sync note" })
 			.addEventListener("click", () => void this.source.syncNote());

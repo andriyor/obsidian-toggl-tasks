@@ -28,6 +28,8 @@ On the **first start** of a task:
 
 Later starts reuse that reference and don't ask for anything.
 
+To track time on a note rather than a task, press **Start note** in the running timer view or run **Start timer for current note**. It starts a timer in the note's project (picked and saved the same way) with the note title as description, without a Toggl task, so this time is not synced into the note.
+
 ## Tracked time
 
 Run **Update tracked time in current note**, or press **Sync note** in the sidebar. It writes:
@@ -46,7 +48,7 @@ Totals under a minute are not written, and a running timer is counted only after
 
 ## Running timer
 
-The ribbon icon or **Show running timer** opens a sidebar view with the running timer's description, project and elapsed time, plus **Sync note** and **Refresh** buttons.
+The ribbon icon or **Show running timer** opens a sidebar view with the running timer's description, project and elapsed time, plus **Start note**, **Sync note** and **Refresh** buttons.
 
 - A timer started with ▶ shows up immediately.
 - Otherwise the view polls `/me/time_entries/current` every 5 minutes, only while it is visible and Obsidian is focused: `/me` requests are limited to 30 per hour per user. A timer stopped in the Toggl app can take up to 5 minutes to disappear, or press **Refresh**.

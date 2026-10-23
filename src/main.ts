@@ -53,6 +53,7 @@ export default class TogglTasksPlugin extends Plugin {
 					current: () => this.toggl.current(),
 					projectName: (id) => this.projectName(id),
 					syncNote: () => this.syncActiveNote(),
+					startNote: () => this.startNoteTimer(),
 				}),
 		);
 		this.addRibbonIcon(
@@ -71,6 +72,12 @@ export default class TogglTasksPlugin extends Plugin {
 				void this.startTimer(line, view.state.field(editorInfoField).file);
 			}),
 		);
+
+		this.addCommand({
+			id: "start-note-timer",
+			name: "Start timer for current note",
+			callback: () => void this.startNoteTimer(),
+		});
 
 		this.addCommand({
 			id: "start-timer",
@@ -117,23 +124,54 @@ export default class TogglTasksPlugin extends Plugin {
 					projectName = project.name;
 				}
 			}
-			const tagIds = await fetchTagIds(this.settings.tagsUrl);
-			const entry = await this.toggl.start(
-				task.description,
-				ref?.projectId ?? null,
-				tagIds,
-				ref?.taskId ?? null,
-			);
-			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
-				if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
-			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
-			new Notice(
-				`Toggl started: ${task.description} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
+			await this.begin(task.description, ref, projectName);
+		} catch (e) {
+			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	/**
+	 * Starts a timer for the note last open in the editor: its project (picked
+	 * and saved like for tasks), the note title as description, no Toggl task.
+	 */
+	async startNoteTimer(): Promise<void> {
+		const file = this.app.workspace.getActiveFile();
+		if (file?.extension !== "md") {
+			new Notice("Toggl: open a note first");
+			return;
+		}
+		try {
+			const project = await this.pickProject(file);
+			await this.begin(
+				file.basename,
+				project && { projectId: project.id, taskId: null },
+				project?.name ?? null,
 			);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
+	}
+
+	/** Starts the entry with the current tags and shows it in the running timer view. */
+	private async begin(
+		description: string,
+		ref: { projectId: number; taskId: number | null } | null,
+		projectName: string | null,
+	): Promise<void> {
+		const tagIds = await fetchTagIds(this.settings.tagsUrl);
+		const entry = await this.toggl.start(
+			description,
+			ref?.projectId ?? null,
+			tagIds,
+			ref?.taskId ?? null,
+		);
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
+			if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
+		}
+		new Notice(
+			`Toggl started: ${description} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
+		);
 	}
 
 	/** Adds the Toggl task reference to the first line equal to `line`. */
