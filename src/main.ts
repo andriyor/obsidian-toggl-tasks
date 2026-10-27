@@ -1,16 +1,14 @@
 import { EditorView } from "@codemirror/view";
-import {
-	App,
-	editorInfoField,
-	FuzzySuggestModal,
-	MarkdownView,
-	Notice,
-	Plugin,
-	PluginSettingTab,
-	Setting,
-	TFile,
-} from "obsidian";
+import { editorInfoField, MarkdownView, Notice, Plugin, TFile } from "obsidian";
 import { startButtons } from "./button";
+import { PickModal } from "./pick";
+import {
+	DEFAULT_SETTINGS,
+	ENV_FILE,
+	PROJECT_PROPERTY,
+	Settings,
+	TogglTasksSettingTab,
+} from "./settings";
 import { fetchTagIds } from "./tags";
 import {
 	formatRef,
@@ -24,11 +22,7 @@ import {
 import { Toggl } from "./toggl";
 import { RunningTimerView, VIEW_TYPE_RUNNING } from "./view";
 
-/** Vault-root file with `TOGGL_API_TOKEN=...`; keep it out of git. */
-const ENV_FILE = ".env";
 const TOKEN_RE = /^TOGGL_API_TOKEN=["']?([^"'\n]+)/m;
-/** Note property naming the Toggl project for its tasks. */
-const PROJECT_PROPERTY = "toggl_project";
 /** Note property with the sum of tracked time of its tasks, in hours. */
 const HOURS_PROPERTY = "toggl_hours";
 /** Note property with the note's own Toggl task, `project/task`. */
@@ -37,21 +31,6 @@ const NOTE_TASK_PROPERTY = "toggl_task";
 const PRIORITY_PROPERTY = "toggl_priority";
 /** `toggl_priority` value for a note whose timers get no priority tag. */
 const NO_PRIORITY = "none";
-
-interface Settings {
-	/** Vault path of a `{ "project name": id }` JSON file. */
-	projectsPath: string;
-	/** URL returning `[{ id }]` of tags to attach to every new timer. */
-	tagsUrl: string;
-	/** Vault path of a `{ "p:high ⏫": id, … }` JSON file for task priorities. */
-	priorityTagsPath: string;
-}
-
-const DEFAULT_SETTINGS: Settings = {
-	projectsPath: "",
-	tagsUrl: "",
-	priorityTagsPath: "",
-};
 
 interface Project {
 	name: string;
@@ -421,105 +400,5 @@ export default class TogglTasksPlugin extends Plugin {
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-	}
-}
-
-/** Fuzzy picker resolving to the chosen item, or null on Esc. */
-class PickModal<T> extends FuzzySuggestModal<T> {
-	private resolve: (item: T | null) => void = () => {};
-
-	constructor(
-		app: App,
-		private readonly items: T[],
-		private readonly text: (item: T) => string,
-		placeholder: string,
-	) {
-		super(app);
-		this.setPlaceholder(placeholder);
-	}
-
-	choose(): Promise<T | null> {
-		return new Promise((resolve) => {
-			this.resolve = resolve;
-			this.open();
-		});
-	}
-
-	getItems(): T[] {
-		return this.items;
-	}
-
-	getItemText(item: T): string {
-		return this.text(item);
-	}
-
-	onChooseItem(item: T): void {
-		this.resolve(item);
-	}
-
-	onClose(): void {
-		// Runs before onChooseItem when an item is picked, so let that win.
-		window.setTimeout(() => this.resolve(null), 0);
-	}
-}
-
-class TogglTasksSettingTab extends PluginSettingTab {
-	constructor(
-		app: App,
-		private readonly plugin: TogglTasksPlugin,
-	) {
-		super(app, plugin);
-	}
-
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("API token")
-			.setDesc(`Read from TOGGL_API_TOKEN in ${ENV_FILE} at the vault root.`);
-
-		new Setting(containerEl)
-			.setName("Projects file")
-			.setDesc(
-				`Vault path of a JSON file mapping project names to ids. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting.`,
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("scripts/toggl-projects.json")
-					.setValue(this.plugin.settings.projectsPath)
-					.onChange(async (value) => {
-						this.plugin.settings.projectsPath = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Tags URL")
-			.setDesc("Optional. Returns [{ id }] of tags added to every new timer.")
-			.addText((text) =>
-				text
-					.setPlaceholder("http://tags.lan/api/selected-tags")
-					.setValue(this.plugin.settings.tagsUrl)
-					.onChange(async (value) => {
-						this.plugin.settings.tagsUrl = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Priority tags file")
-			.setDesc(
-				'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, added for the task\'s priority emoji.',
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("scripts/toggl-priority-tags.json")
-					.setValue(this.plugin.settings.priorityTagsPath)
-					.onChange(async (value) => {
-						this.plugin.settings.priorityTagsPath = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
 	}
 }
