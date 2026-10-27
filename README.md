@@ -21,12 +21,12 @@ Desktop only.
 
 Press the **▶** pill at the end of an open task (Live Preview and source mode), or run **Start timer for task on current line**.
 
-| Timer field | Comes from                                                                                                                                                   |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets                                                          |
-| Project     | The note's `toggl_project` property, looked up by name in the projects file                                                                                  |
-| Tags        | Tag ids returned by the tags URL, if set, plus the priority tag named after the emoji: `p:highest 🔺`, `p:high ⏫`, `p:medium 🔼`, `p:low 🔽`, `p:lowest ⏬` |
-| Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                                                                              |
+| Timer field | Comes from                                                                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets                                                                             |
+| Project     | The note's `toggl_project` property, looked up by name in the projects file                                                                                                     |
+| Tags        | Tag ids returned by the tags URL, if set, plus a priority tag (see [Priority](#priority)): 🔺 `p:highest 🔺`, ⏫ `p:high ⏫`, 🔼 `p:medium 🔼`, 🔽 `p:low 🔽`, ⏬ `p:lowest ⏬` |
+| Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                                                                                                 |
 
 On the **first start** of a task:
 
@@ -38,6 +38,16 @@ On the **first start** of a task:
    ```
 
 Later starts reuse that reference and don't ask for anything.
+
+### Priority
+
+With a priority tags file set, every timer gets one priority tag:
+
+1. The task's priority emoji, if it has one.
+2. Otherwise the note's `toggl_priority` property, e.g. `toggl_priority: p:high ⏫`. This is also the priority of note timers.
+3. Otherwise you pick one from the file's tags, and the choice is saved as `toggl_priority`. Pick **none** to save `toggl_priority: none`, so the note's timers get no priority tag and it doesn't ask again. Esc starts this timer without a priority and saves nothing.
+
+A task without an emoji is "normal" in Tasks, but here it takes the note's priority instead.
 
 ### For a whole note
 

@@ -33,6 +33,10 @@ const PROJECT_PROPERTY = "toggl_project";
 const HOURS_PROPERTY = "toggl_hours";
 /** Note property with the note's own Toggl task, `project/task`. */
 const NOTE_TASK_PROPERTY = "toggl_task";
+/** Note property with the priority tag name for tasks without a priority emoji. */
+const PRIORITY_PROPERTY = "toggl_priority";
+/** `toggl_priority` value for a note whose timers get no priority tag. */
+const NO_PRIORITY = "none";
 
 interface Settings {
 	/** Vault path of a `{ "project name": id }` JSON file. */
@@ -182,11 +186,8 @@ export default class TogglTasksPlugin extends Plugin {
 			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
 			const tagIds = await fetchTagIds(this.settings.tagsUrl);
-			if (priority) {
-				const id = (await this.loadIds(this.settings.priorityTagsPath))[priority];
-				if (id) tagIds.push(id);
-				else new Notice(`Toggl: tag "${priority}" is not in the priority tags file`);
-			}
+			const priorityId = await this.priorityTagId(file, priority);
+			if (priorityId) tagIds.push(priorityId);
 			const entry = await this.toggl.start(
 				description,
 				ref?.projectId ?? null,
@@ -202,6 +203,48 @@ export default class TogglTasksPlugin extends Plugin {
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
+	}
+
+	/**
+	 * Tag id for the task's `priority`, else the note's. Null when the priority
+	 * tags file is unset or there is no priority.
+	 */
+	private async priorityTagId(
+		file: TFile | null,
+		priority: string | null,
+	): Promise<number | null> {
+		const tags = await this.loadIds(this.settings.priorityTagsPath);
+		const names = Object.keys(tags);
+		if (!names.length) return null;
+		const name = priority ?? (file ? await this.notePriority(file, names) : null);
+		if (!name || name === NO_PRIORITY) return null;
+		if (!tags[name])
+			new Notice(`Toggl: tag "${name}" is not in ${this.settings.priorityTagsPath}`);
+		return tags[name] ?? null;
+	}
+
+	/**
+	 * The note's `toggl_priority`, else a choice from `names` saved as
+	 * `toggl_priority` ("none" saves no priority; Esc = none, saves nothing).
+	 */
+	private async notePriority(file: TFile, names: string[]): Promise<string | null> {
+		const saved = this.noteProperty(file, PRIORITY_PROPERTY);
+		if (typeof saved === "string") return saved;
+		const picked = await new PickModal(
+			this.app,
+			[...names, NO_PRIORITY],
+			(n) => n,
+			"Toggl priority (Esc = none this time)",
+		).choose();
+		if (picked) {
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(fm: Record<string, unknown>) => {
+					fm[PRIORITY_PROPERTY] = picked;
+				},
+			);
+		}
+		return picked;
 	}
 
 	/**
@@ -277,7 +320,12 @@ export default class TogglTasksPlugin extends Plugin {
 			return project ?? null;
 		}
 		if (!projects.length) return null;
-		const project = await new ProjectModal(this.app, projects).choose();
+		const project = await new PickModal(
+			this.app,
+			projects,
+			(p) => p.name,
+			"Toggl project (Esc = no project)",
+		).choose();
 		// Remember the choice so the note's other tasks don't ask again.
 		if (project && file) {
 			await this.app.fileManager.processFrontMatter(
@@ -370,34 +418,37 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 }
 
-class ProjectModal extends FuzzySuggestModal<Project> {
-	private resolve: (project: Project | null) => void = () => {};
+/** Fuzzy picker resolving to the chosen item, or null on Esc. */
+class PickModal<T> extends FuzzySuggestModal<T> {
+	private resolve: (item: T | null) => void = () => {};
 
 	constructor(
 		app: App,
-		private readonly projects: Project[],
+		private readonly items: T[],
+		private readonly text: (item: T) => string,
+		placeholder: string,
 	) {
 		super(app);
-		this.setPlaceholder("Toggl project (Esc = no project)");
+		this.setPlaceholder(placeholder);
 	}
 
-	choose(): Promise<Project | null> {
+	choose(): Promise<T | null> {
 		return new Promise((resolve) => {
 			this.resolve = resolve;
 			this.open();
 		});
 	}
 
-	getItems(): Project[] {
-		return this.projects;
+	getItems(): T[] {
+		return this.items;
 	}
 
-	getItemText(project: Project): string {
-		return project.name;
+	getItemText(item: T): string {
+		return this.text(item);
 	}
 
-	onChooseItem(project: Project): void {
-		this.resolve(project);
+	onChooseItem(item: T): void {
+		this.resolve(item);
 	}
 
 	onClose(): void {
