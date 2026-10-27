@@ -397,8 +397,4 @@ export default class TogglTasksPlugin extends Plugin {
 			...((await this.loadData()) as Partial<Settings>),
 		};
 	}
-
-	async saveSettings(): Promise<void> {
-		await this.saveData(this.settings);
-	}
 }

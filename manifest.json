@@ -2,7 +2,7 @@
 	"id": "toggl-tasks",
 	"name": "Toggl Tasks",
 	"version": "0.1.0",
-	"minAppVersion": "1.11.4",
+	"minAppVersion": "1.13.0",
 	"description": "Start a Toggl Track timer from a task line and write the time tracked per task and per note.",
 	"author": "aoriekhov",
 	"isDesktopOnly": true

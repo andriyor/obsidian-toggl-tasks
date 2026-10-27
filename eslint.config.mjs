@@ -8,6 +8,15 @@ export default [
 	...obsidianmd.configs.recommended,
 	...tseslint.configs.recommended,
 	{
+		rules: {
+			// Toggl is a brand; URL placeholders are not sentences.
+			"obsidianmd/ui/sentence-case": [
+				"warn",
+				{ ignoreWords: ["Toggl"], ignoreRegex: ["^https?://"] },
+			],
+		},
+	},
+	{
 		// The build script and the tests run under Node, not inside Obsidian.
 		files: ["esbuild.config.mjs", "test/**/*.mts"],
 		rules: {

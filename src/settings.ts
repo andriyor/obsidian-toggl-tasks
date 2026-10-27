@@ -1,5 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
-import type TogglTasksPlugin from "./main";
+import { PluginSettingTab, SettingDefinitionItem, TFile } from "obsidian";
 
 /** Vault-root file with `TOGGL_API_TOKEN=...`; keep it out of git. */
 export const ENV_FILE = ".env";
@@ -21,63 +20,45 @@ export const DEFAULT_SETTINGS: Settings = {
 	priorityTagsPath: "",
 };
 
+const isJson = (file: TFile): boolean => file.extension === "json";
+
+/** Declarative, so the settings show up in Obsidian's settings search. */
 export class TogglTasksSettingTab extends PluginSettingTab {
-	constructor(
-		app: App,
-		private readonly plugin: TogglTasksPlugin,
-	) {
-		super(app, plugin);
-	}
-
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("API token")
-			.setDesc(`Read from TOGGL_API_TOKEN in ${ENV_FILE} at the vault root.`);
-
-		new Setting(containerEl)
-			.setName("Projects file")
-			.setDesc(
-				`Vault path of a JSON file mapping project names to ids. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting.`,
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("scripts/toggl-projects.json")
-					.setValue(this.plugin.settings.projectsPath)
-					.onChange(async (value) => {
-						this.plugin.settings.projectsPath = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Tags URL")
-			.setDesc("Optional. Returns [{ id }] of tags added to every new timer.")
-			.addText((text) =>
-				text
-					.setPlaceholder("http://tags.lan/api/selected-tags")
-					.setValue(this.plugin.settings.tagsUrl)
-					.onChange(async (value) => {
-						this.plugin.settings.tagsUrl = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Priority tags file")
-			.setDesc(
-				'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, added for the task\'s priority emoji.',
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("scripts/toggl-priority-tags.json")
-					.setValue(this.plugin.settings.priorityTagsPath)
-					.onChange(async (value) => {
-						this.plugin.settings.priorityTagsPath = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
+	getSettingDefinitions(): SettingDefinitionItem<keyof Settings>[] {
+		return [
+			{
+				name: "API token",
+				desc: `Read from TOGGL_API_TOKEN in ${ENV_FILE} at the vault root.`,
+			},
+			{
+				name: "Projects file",
+				desc: `Vault path of a JSON file mapping project names to ids. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting.`,
+				control: {
+					type: "file",
+					key: "projectsPath",
+					placeholder: "scripts/toggl-projects.json",
+					filter: isJson,
+				},
+			},
+			{
+				name: "Tags URL",
+				desc: "Optional. Returns [{ id }] of tags added to every new timer.",
+				control: {
+					type: "text",
+					key: "tagsUrl",
+					placeholder: "http://tags.lan/api/selected-tags",
+				},
+			},
+			{
+				name: "Priority tags file",
+				desc: 'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, added for the task\'s priority emoji.',
+				control: {
+					type: "file",
+					key: "priorityTagsPath",
+					placeholder: "scripts/toggl-priority-tags.json",
+					filter: isJson,
+				},
+			},
+		];
 	}
 }
