@@ -11,7 +11,10 @@
 		"typecheck": "tsc --noEmit --skipLibCheck",
 		"test": "node --test --experimental-strip-types test/task.test.mts",
 		"lint": "eslint .",
-		"format": "prettier --write ."
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
 	},
 	"license": "MIT",
 	"devDependencies": {
