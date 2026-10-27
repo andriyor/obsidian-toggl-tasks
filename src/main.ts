@@ -12,7 +12,15 @@ import {
 } from "obsidian";
 import { startButtons } from "./button";
 import { fetchTagIds } from "./tags";
-import { formatSeconds, parseTask, setTaskRef, setTaskTime, TaskRef } from "./task";
+import {
+	formatRef,
+	formatSeconds,
+	parseRef,
+	parseTask,
+	setTaskRef,
+	setTaskTime,
+	TaskRef,
+} from "./task";
 import { Toggl } from "./toggl";
 import { RunningTimerView, VIEW_TYPE_RUNNING } from "./view";
 
@@ -23,6 +31,8 @@ const TOKEN_RE = /^TOGGL_API_TOKEN=["']?([^"'\n]+)/m;
 const PROJECT_PROPERTY = "toggl_project";
 /** Note property with the sum of tracked time of its tasks, in hours. */
 const HOURS_PROPERTY = "toggl_hours";
+/** Note property with the note's own Toggl task, `project/task`. */
+const NOTE_TASK_PROPERTY = "toggl_task";
 
 interface Settings {
 	/** Vault path of a `{ "project name": id }` JSON file. */
@@ -132,8 +142,9 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Starts a timer for the note last open in the editor: its project (picked
-	 * and saved like for tasks), the note title as description, no Toggl task.
+	 * Starts a timer for the note last open in the editor, with the note title as
+	 * description. The first start in a project creates a Toggl task for the
+	 * note and saves it as the note's `toggl_task`, like task lines do.
 	 */
 	async startNoteTimer(): Promise<void> {
 		const file = this.app.workspace.getActiveFile();
@@ -142,12 +153,27 @@ export default class TogglTasksPlugin extends Plugin {
 			return;
 		}
 		try {
-			const project = await this.pickProject(file);
-			await this.begin(
-				file.basename,
-				project && { projectId: project.id, taskId: null },
-				project?.name ?? null,
-			);
+			let ref = parseRef(this.noteProperty(file, NOTE_TASK_PROPERTY));
+			let projectName: string | null = null;
+			if (!ref) {
+				const project = await this.pickProject(file);
+				if (project) {
+					ref = {
+						projectId: project.id,
+						taskId: await this.toggl.createTask(project.id, file.basename),
+					};
+					const saved = formatRef(ref);
+					await this.app.fileManager.processFrontMatter(
+						file,
+						(fm: Record<string, unknown>) => {
+							fm[NOTE_TASK_PROPERTY] = saved;
+						},
+					);
+					projectName = project.name;
+				}
+			}
+			projectName ??= ref ? await this.projectName(ref.projectId) : null;
+			await this.begin(file.basename, ref, projectName);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
@@ -216,9 +242,7 @@ export default class TogglTasksPlugin extends Plugin {
 	 */
 	private async pickProject(file: TFile | null): Promise<Project | null> {
 		const projects = await this.loadProjects();
-		const wanted: unknown = file
-			? this.app.metadataCache.getFileCache(file)?.frontmatter?.[PROJECT_PROPERTY]
-			: undefined;
+		const wanted = file ? this.noteProperty(file, PROJECT_PROPERTY) : undefined;
 		if (typeof wanted === "string") {
 			const project = projects.find((p) => p.name === wanted);
 			if (!project)
@@ -239,6 +263,10 @@ export default class TogglTasksPlugin extends Plugin {
 		return project;
 	}
 
+	private noteProperty(file: TFile, name: string): unknown {
+		return this.app.metadataCache.getFileCache(file)?.frontmatter?.[name];
+	}
+
 	private async loadProjects(): Promise<Project[]> {
 		const path = this.settings.projectsPath;
 		if (!path || !(await this.app.vault.adapter.exists(path))) return [];
@@ -250,21 +278,24 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Writes `[toggl:: h:mm]` to each task with a Toggl task and the sum to
-	 * `toggl_hours`, with one request per project. Tasks started without a
-	 * project have no Toggl task and are left as they are.
+	 * Writes `[toggl:: h:mm]` to each task with a Toggl task and the sum, plus
+	 * the note's own `toggl_task`, to `toggl_hours`, with one request per
+	 * project. Tasks started without a project have no Toggl task and are left
+	 * as they are.
 	 */
 	async syncNote(file: TFile): Promise<void> {
 		const tasks = (await this.app.vault.read(file))
 			.split("\n")
 			.flatMap((line) => parseTask(line)?.ref ?? []);
-		if (!tasks.length) {
+		const noteRef = parseRef(this.noteProperty(file, NOTE_TASK_PROPERTY));
+		if (!tasks.length && !noteRef) {
 			new Notice("Toggl: no tasks with a Toggl task in this note");
 			return;
 		}
 		const byTask = new Map<number, number>(); // Toggl task id → seconds
 		try {
-			for (const pid of new Set(tasks.map((t) => t.projectId))) {
+			const refs = noteRef ? [...tasks, noteRef] : tasks;
+			for (const pid of new Set(refs.map((t) => t.projectId))) {
 				for (const [id, s] of await this.toggl.projectTaskSeconds(pid)) byTask.set(id, s);
 			}
 		} catch (e) {
@@ -272,7 +303,7 @@ export default class TogglTasksPlugin extends Plugin {
 			return;
 		}
 
-		let total = 0;
+		let total = noteRef ? (byTask.get(noteRef.taskId) ?? 0) : 0;
 		await this.app.vault.process(file, (text) =>
 			text
 				.split("\n")

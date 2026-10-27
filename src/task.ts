@@ -7,6 +7,7 @@ const TIME_FIELD = "toggl";
 const REF_FIELD = "toggl_task";
 const OWN_FIELDS_RE = /\s*\[toggl(?:_task)?:: [^\]]*\]/gu;
 const REF_RE = /\[toggl_task:: (\d+)\/(\d+)\]/u;
+const REF_VALUE_RE = /^(\d+)\/(\d+)$/u;
 const TIME_RE = /\[toggl:: ([^\]]*)\]/u;
 
 // Tasks plugin metadata (emoji format).
@@ -70,9 +71,20 @@ export function setTaskTime(line: string, seconds: number): string {
 	return setField(line, TIME_FIELD, seconds < 60 ? null : formatSeconds(seconds));
 }
 
+/** `project/task`, the form a reference is stored in. */
+export function formatRef(ref: TaskRef): string {
+	return `${ref.projectId}/${ref.taskId}`;
+}
+
+/** Reads `project/task`, e.g. a note's `toggl_task` property; null if malformed. */
+export function parseRef(value: unknown): TaskRef | null {
+	const m = typeof value === "string" ? REF_VALUE_RE.exec(value.trim()) : null;
+	return m ? { projectId: Number(m[1]), taskId: Number(m[2]) } : null;
+}
+
 /** Writes `[toggl_task:: project/task]` into a task line. */
 export function setTaskRef(line: string, ref: TaskRef): string {
-	return setField(line, REF_FIELD, `${ref.projectId}/${ref.taskId}`);
+	return setField(line, REF_FIELD, formatRef(ref));
 }
 
 /** Replaces or removes `[name:: value]`, keeping it before trailing Tasks metadata. */

@@ -1,6 +1,19 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
-import { formatSeconds, parseTask, setTaskRef, setTaskTime } from "../src/task.ts";
+import {
+	formatSeconds,
+	parseRef,
+	parseTask,
+	setTaskRef,
+	setTaskTime,
+} from "../src/task.ts";
+
+test("parseRef reads a note's toggl_task property", () => {
+	assert.deepEqual(parseRef(" 12/34 "), { projectId: 12, taskId: 34 });
+	assert.equal(parseRef("12"), null);
+	assert.equal(parseRef(1234), null);
+	assert.equal(parseRef(undefined), null);
+});
 
 test("parseTask strips Tasks metadata, links, tags and the time field", () => {
 	assert.deepEqual(

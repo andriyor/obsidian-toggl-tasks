@@ -40,7 +40,7 @@ Later starts reuse that reference and don't ask for anything.
 
 ### For a whole note
 
-Press **Start note** in the running timer view or run **Start timer for current note**. It starts a timer in the note's project (picked and saved the same way) with the note title as description, without a Toggl task, so this time is not synced into the note.
+Press **Start note** in the running timer view or run **Start timer for current note**. It starts a timer in the note's project (picked and saved the same way) with the note title as description. The first start creates a Toggl task for the note and saves it as the note's `toggl_task` property, e.g. `toggl_task: 1234567/7654321`; later starts reuse it. Esc in the project list starts the timer without a project and saves nothing, so that time is not synced.
 
 ## Tracked time
 
@@ -52,7 +52,7 @@ Run **Update tracked time in current note**, or press **Sync note** in the sideb
   - [ ] write docs [toggl:: 1:15] [toggl_task:: 1234567/7654321] 📅 2026-10-20
   ```
 
-- the sum for the note as the `toggl_hours` property, e.g. `toggl_hours: 3.5`
+- the sum for the note, including the note's own `toggl_task`, as the `toggl_hours` property, e.g. `toggl_hours: 3.5`
 
 Totals come from the tasks' Toggl tasks: one request per project, all time, and renaming a task keeps its time. Tasks without a Toggl task are left as they are.
 
