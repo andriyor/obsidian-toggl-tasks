@@ -9,6 +9,15 @@ const OWN_FIELDS_RE = /\s*\[toggl(?:_task)?:: [^\]]*\]/gu;
 const REF_RE = /\[toggl_task:: (\d+)\/(\d+)\]/u;
 const REF_VALUE_RE = /^(\d+)\/(\d+)$/u;
 const TIME_RE = /\[toggl:: ([^\]]*)\]/u;
+const PRIORITY_RE = /[🔺⏫🔼🔽⏬]/u;
+/** Tasks priority emoji → Toggl tag name, looked up in the priority tags file. */
+const PRIORITY_TAGS: Record<string, string> = {
+	"🔺": "p:highest 🔺",
+	"⏫": "p:high ⏫",
+	"🔼": "p:medium 🔼",
+	"🔽": "p:low 🔽",
+	"⏬": "p:lowest ⏬",
+};
 
 // Tasks plugin metadata (emoji format).
 const META_RE = new RegExp(
@@ -40,6 +49,8 @@ export interface Task {
 	ref: TaskRef | null;
 	/** Last synced `h:mm`, if any. */
 	time: string | null;
+	/** Toggl tag name for the Tasks priority, e.g. `p:high` for ⏫. */
+	priority: string | null;
 }
 
 export function parseTask(line: string): Task | null {
@@ -57,6 +68,7 @@ export function parseTask(line: string): Task | null {
 		done: DONE_STATUSES.has(m[1]),
 		ref: ref ? { projectId: Number(ref[1]), taskId: Number(ref[2]) } : null,
 		time: TIME_RE.exec(m[2])?.[1] ?? null,
+		priority: PRIORITY_TAGS[PRIORITY_RE.exec(m[2])?.[0] ?? ""] ?? null,
 	};
 }
 

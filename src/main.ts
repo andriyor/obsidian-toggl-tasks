@@ -39,9 +39,15 @@ interface Settings {
 	projectsPath: string;
 	/** URL returning `[{ id }]` of tags to attach to every new timer. */
 	tagsUrl: string;
+	/** Vault path of a `{ "p:high ⏫": id, … }` JSON file for task priorities. */
+	priorityTagsPath: string;
 }
 
-const DEFAULT_SETTINGS: Settings = { projectsPath: "", tagsUrl: "" };
+const DEFAULT_SETTINGS: Settings = {
+	projectsPath: "",
+	tagsUrl: "",
+	priorityTagsPath: "",
+};
 
 interface Project {
 	name: string;
@@ -120,7 +126,7 @@ export default class TogglTasksPlugin extends Plugin {
 			new Notice("Toggl: not a task line");
 			return;
 		}
-		await this.begin(task.description, task.ref, file, async (ref) => {
+		await this.begin(task.description, task.ref, file, task.priority, async (ref) => {
 			if (file) await this.writeRef(file, line, ref);
 		});
 	}
@@ -137,7 +143,7 @@ export default class TogglTasksPlugin extends Plugin {
 			return;
 		}
 		const ref = parseRef(this.noteProperty(file, NOTE_TASK_PROPERTY));
-		await this.begin(file.basename, ref, file, async (created) => {
+		await this.begin(file.basename, ref, file, null, async (created) => {
 			const saved = formatRef(created);
 			await this.app.fileManager.processFrontMatter(
 				file,
@@ -149,14 +155,16 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Starts the entry with the current tags and shows it in the running timer
-	 * view. Without a `ref`, picks the note's project and creates a Toggl task
-	 * there, handing it to `save`; Esc in the picker starts without a project.
+	 * Starts the entry with the current tags plus the `priority` tag, and shows
+	 * it in the running timer view. Without a `ref`, picks the note's project and
+	 * creates a Toggl task there, handing it to `save`; Esc in the picker starts
+	 * without a project.
 	 */
 	private async begin(
 		description: string,
 		ref: TaskRef | null,
 		file: TFile | null,
+		priority: string | null,
 		save: (ref: TaskRef) => Promise<void>,
 	): Promise<void> {
 		try {
@@ -174,6 +182,11 @@ export default class TogglTasksPlugin extends Plugin {
 			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
 			const tagIds = await fetchTagIds(this.settings.tagsUrl);
+			if (priority) {
+				const id = (await this.loadIds(this.settings.priorityTagsPath))[priority];
+				if (id) tagIds.push(id);
+				else new Notice(`Toggl: tag "${priority}" is not in the priority tags file`);
+			}
 			const entry = await this.toggl.start(
 				description,
 				ref?.projectId ?? null,
@@ -259,13 +272,14 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	private async loadProjects(): Promise<Project[]> {
-		const path = this.settings.projectsPath;
-		if (!path || !(await this.app.vault.adapter.exists(path))) return [];
-		const map = JSON.parse(await this.app.vault.adapter.read(path)) as Record<
-			string,
-			number
-		>;
+		const map = await this.loadIds(this.settings.projectsPath);
 		return Object.entries(map).map(([name, id]) => ({ name, id }));
+	}
+
+	/** A `{ "name": id }` JSON file in the vault; empty when unset or missing. */
+	private async loadIds(path: string): Promise<Record<string, number>> {
+		if (!path || !(await this.app.vault.adapter.exists(path))) return {};
+		return JSON.parse(await this.app.vault.adapter.read(path)) as Record<string, number>;
 	}
 
 	/**
@@ -409,6 +423,21 @@ class TogglTasksSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.tagsUrl)
 					.onChange(async (value) => {
 						this.plugin.settings.tagsUrl = value.trim();
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Priority tags file")
+			.setDesc(
+				'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, added for the task\'s priority emoji.',
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("scripts/toggl-priority-tags.json")
+					.setValue(this.plugin.settings.priorityTagsPath)
+					.onChange(async (value) => {
+						this.plugin.settings.priorityTagsPath = value.trim();
 						await this.plugin.saveSettings();
 					}),
 			);

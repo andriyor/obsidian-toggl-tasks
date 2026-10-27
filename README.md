@@ -8,11 +8,12 @@ Desktop only.
 
 ## Setup
 
-| Setting       | Description                                                                                            |
-| ------------- | ------------------------------------------------------------------------------------------------------ |
-| API token     | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git. |
-| Projects file | Vault path of a JSON file `{ "project name": id }`                                                     |
-| Tags URL      | Optional. Returns `[{ "id": 123 }, …]`.                                                                |
+| Setting            | Description                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| API token          | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.                              |
+| Projects file      | Vault path of a JSON file `{ "project name": id }`                                                                                  |
+| Tags URL           | Optional. Returns `[{ "id": 123 }, …]`.                                                                                             |
+| Priority tags file | Optional. Vault path of a JSON file `{ "p:highest 🔺": id, "p:high ⏫": id, "p:medium 🔼": id, "p:low 🔽": id, "p:lowest ⏬": id }` |
 
 ## Start a timer
 
@@ -20,12 +21,12 @@ Desktop only.
 
 Press the **▶** pill at the end of an open task (Live Preview and source mode), or run **Start timer for task on current line**.
 
-| Timer field | Comes from                                                                                          |
-| ----------- | --------------------------------------------------------------------------------------------------- |
-| Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets |
-| Project     | The note's `toggl_project` property, looked up by name in the projects file                         |
-| Tags        | Tag ids returned by the tags URL, if set                                                            |
-| Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                     |
+| Timer field | Comes from                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets                                                          |
+| Project     | The note's `toggl_project` property, looked up by name in the projects file                                                                                  |
+| Tags        | Tag ids returned by the tags URL, if set, plus the priority tag named after the emoji: `p:highest 🔺`, `p:high ⏫`, `p:medium 🔼`, `p:low 🔽`, `p:lowest ⏬` |
+| Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                                                                              |
 
 On the **first start** of a task:
 
@@ -74,6 +75,7 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 - **`toggl_hours` is a decimal number, not `h:mm`.** A number can be summed and compared in Dataview and Bases queries; an `h:mm` string cannot. Task lines use `h:mm` because they are read, not queried.
 - **Inline fields go before Tasks metadata.** The Tasks plugin only parses emoji fields at the end of the line; appending `[toggl:: …]` after `📅 …` would turn the dates into description text.
 - **Projects come from a hand-kept JSON file.** Projects rarely change, and a local name → id map avoids an API call per start. `GET /me/projects` returns all of them unpaginated, unlike `/workspaces/{id}/projects`, which cuts off at the first page. A picked project is saved per note as `toggl_project`.
+- **Priority is a tag.** Toggl time entries and tasks have no priority field. The tag is set when a timer starts, so an entry keeps the priority the task had while it was worked on, and reports can be filtered by it. Tags are created once in Toggl and mapped by name in a JSON file, like projects, so starting a timer needs no tag lookup.
 - **Token in `.env`, not in plugin settings.** Plugin `data.json` can end up in git when a vault is versioned; `.env` stays out of it and can be shared with other Toggl scripts. Obsidian's secret storage is a todo.
 - **Running timer polls rarely.** `/me` requests are capped at 30 per hour per user across all Toggl clients, so the view polls every 5 minutes, only when visible and focused, and shows a just-started timer from the start response.
 
