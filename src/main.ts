@@ -120,25 +120,9 @@ export default class TogglTasksPlugin extends Plugin {
 			new Notice("Toggl: not a task line");
 			return;
 		}
-		try {
-			let ref = task.ref;
-			let projectName: string | null = null;
-			if (!ref) {
-				const project = await this.pickProject(file);
-				if (project) {
-					ref = {
-						projectId: project.id,
-						taskId: await this.toggl.createTask(project.id, task.description),
-					};
-					if (file) await this.writeRef(file, line, ref);
-					projectName = project.name;
-				}
-			}
-			projectName ??= ref ? await this.projectName(ref.projectId) : null;
-			await this.begin(task.description, ref, projectName);
-		} catch (e) {
-			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
-		}
+		await this.begin(task.description, task.ref, file, async (ref) => {
+			if (file) await this.writeRef(file, line, ref);
+		});
 	}
 
 	/**
@@ -152,52 +136,59 @@ export default class TogglTasksPlugin extends Plugin {
 			new Notice("Toggl: open a note first");
 			return;
 		}
+		const ref = parseRef(this.noteProperty(file, NOTE_TASK_PROPERTY));
+		await this.begin(file.basename, ref, file, async (created) => {
+			const saved = formatRef(created);
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(fm: Record<string, unknown>) => {
+					fm[NOTE_TASK_PROPERTY] = saved;
+				},
+			);
+		});
+	}
+
+	/**
+	 * Starts the entry with the current tags and shows it in the running timer
+	 * view. Without a `ref`, picks the note's project and creates a Toggl task
+	 * there, handing it to `save`; Esc in the picker starts without a project.
+	 */
+	private async begin(
+		description: string,
+		ref: TaskRef | null,
+		file: TFile | null,
+		save: (ref: TaskRef) => Promise<void>,
+	): Promise<void> {
 		try {
-			let ref = parseRef(this.noteProperty(file, NOTE_TASK_PROPERTY));
 			let projectName: string | null = null;
 			if (!ref) {
 				const project = await this.pickProject(file);
 				if (project) {
 					ref = {
 						projectId: project.id,
-						taskId: await this.toggl.createTask(project.id, file.basename),
+						taskId: await this.toggl.createTask(project.id, description),
 					};
-					const saved = formatRef(ref);
-					await this.app.fileManager.processFrontMatter(
-						file,
-						(fm: Record<string, unknown>) => {
-							fm[NOTE_TASK_PROPERTY] = saved;
-						},
-					);
+					await save(ref);
 					projectName = project.name;
 				}
 			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
-			await this.begin(file.basename, ref, projectName);
+			const tagIds = await fetchTagIds(this.settings.tagsUrl);
+			const entry = await this.toggl.start(
+				description,
+				ref?.projectId ?? null,
+				tagIds,
+				ref?.taskId ?? null,
+			);
+			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
+				if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
+			}
+			new Notice(
+				`Toggl started: ${description} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
+			);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
-	}
-
-	/** Starts the entry with the current tags and shows it in the running timer view. */
-	private async begin(
-		description: string,
-		ref: { projectId: number; taskId: number | null } | null,
-		projectName: string | null,
-	): Promise<void> {
-		const tagIds = await fetchTagIds(this.settings.tagsUrl);
-		const entry = await this.toggl.start(
-			description,
-			ref?.projectId ?? null,
-			tagIds,
-			ref?.taskId ?? null,
-		);
-		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
-			if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
-		}
-		new Notice(
-			`Toggl started: ${description} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
-		);
 	}
 
 	/** Adds the Toggl task reference to the first line equal to `line`. */
