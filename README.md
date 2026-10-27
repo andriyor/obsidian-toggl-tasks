@@ -4,7 +4,7 @@ Obsidian plugin that starts [Toggl Track](https://toggl.com/track/) timers from 
 
 Toggl stays the source of truth: timers are stopped in the Toggl apps, and the plugin reads the totals back from the Toggl API.
 
-Desktop only.
+Desktop only, Obsidian 1.13 or later.
 
 ## Setup
 
@@ -87,6 +87,7 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 - **Projects come from a hand-kept JSON file.** Projects rarely change, and a local name → id map avoids an API call per start. `GET /me/projects` returns all of them unpaginated, unlike `/workspaces/{id}/projects`, which cuts off at the first page. A picked project is saved per note as `toggl_project`.
 - **Priority is a tag.** Toggl time entries and tasks have no priority field. The tag is set when a timer starts, so an entry keeps the priority the task had while it was worked on, and reports can be filtered by it. Tags are created once in Toggl and mapped by name in a JSON file, like projects, so starting a timer needs no tag lookup.
 - **Token in `.env`, not in plugin settings.** Plugin `data.json` can end up in git when a vault is versioned; `.env` stays out of it and can be shared with other Toggl scripts. Obsidian's secret storage is a todo.
+- **The task reference is written through the open editor.** Writing it to the file on disk while the note has unsaved edits gets overwritten by the editor's next save; the line then has no reference, and the next start tries to create the same Toggl task again, which Toggl rejects with 400.
 - **Running timer polls rarely.** `/me` requests are capped at 30 per hour per user across all Toggl clients, so the view polls every 5 minutes, only when visible and focused, and shows a just-started timer from the start response.
 
 ## Development
@@ -95,10 +96,11 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 pnpm install
 pnpm dev     # watch build
 pnpm test
-pnpm lint
+pnpm lint    # or lint:fix
+pnpm check   # typecheck, lint, format check and tests
 ```
 
 ## Todo
 
-- [ ] Optional token from Obsidian's secret storage (`SecretComponent` + `app.secretStorage`, Obsidian 1.11.4+), for vaults without a `.env`
+- [ ] Optional token from Obsidian's secret storage (a `secret` control in the settings definitions + `app.secretStorage`), for vaults without a `.env`
 - [ ] Running timer from the [toggl-lock](https://github.com/andriyor/toggl-lock) server instead of the Toggl API: its webhook-fed `state.display` (`{ message, project, startedAt }`) is current within seconds and polling it costs no Toggl quota. Needs a narrow `GET /display` route there (today only `GET /state`, which also exposes push tokens) and a URL + `APP_SECRET` setting here.
