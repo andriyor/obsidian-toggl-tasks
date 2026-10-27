@@ -185,8 +185,14 @@ export default class TogglTasksPlugin extends Plugin {
 				}
 			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
-			const tagIds = await fetchTagIds(this.settings.tagsUrl);
-			const priorityId = await this.priorityTagId(file, priority);
+			const priorityTags = await this.loadIds(this.settings.priorityTagsPath);
+			// The entry gets one priority tag, from the task or note, so drop any the
+			// tags URL returns.
+			const priorityIds = new Set(Object.values(priorityTags));
+			const tagIds = (await fetchTagIds(this.settings.tagsUrl)).filter(
+				(id) => !priorityIds.has(id),
+			);
+			const priorityId = await this.priorityTagId(file, priority, priorityTags);
 			if (priorityId) tagIds.push(priorityId);
 			const entry = await this.toggl.start(
 				description,
@@ -206,14 +212,14 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Tag id for the task's `priority`, else the note's. Null when the priority
-	 * tags file is unset or there is no priority.
+	 * Tag id in `tags` for the task's `priority`, else the note's. Null when the
+	 * priority tags file is unset or there is no priority.
 	 */
 	private async priorityTagId(
 		file: TFile | null,
 		priority: string | null,
+		tags: Record<string, number>,
 	): Promise<number | null> {
-		const tags = await this.loadIds(this.settings.priorityTagsPath);
 		const names = Object.keys(tags);
 		if (!names.length) return null;
 		const name = priority ?? (file ? await this.notePriority(file, names) : null);

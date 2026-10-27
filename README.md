@@ -41,7 +41,7 @@ Later starts reuse that reference and don't ask for anything.
 
 ### Priority
 
-With a priority tags file set, every timer gets one priority tag:
+With a priority tags file set, every timer gets at most one priority tag. Priority tags returned by the tags URL are dropped; the priority comes from:
 
 1. The task's priority emoji, if it has one.
 2. Otherwise the note's `toggl_priority` property, e.g. `toggl_priority: p:high ⏫`. This is also the priority of note timers.
