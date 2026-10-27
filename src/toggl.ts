@@ -1,6 +1,13 @@
-import { requestUrl } from "obsidian";
+import { requestUrl, RequestUrlParam, RequestUrlResponse } from "obsidian";
 
 const API = "https://api.track.toggl.com/api/v9";
+
+/** `requestUrl` that puts Toggl's error text, e.g. why a 400 failed, in the error. */
+async function request(params: RequestUrlParam): Promise<RequestUrlResponse> {
+	const res = await requestUrl({ ...params, throw: false });
+	if (res.status >= 400) throw new Error(`${res.status} ${res.text.trim()}`);
+	return res;
+}
 
 /** A time entry as the v9 API returns it; running when `duration` is negative. */
 export interface TimeEntry {
@@ -31,7 +38,7 @@ export class Toggl {
 
 	private async workspace(): Promise<number> {
 		if (this.workspaceId === null) {
-			const me = await requestUrl({ url: `${API}/me`, headers: await this.headers() });
+			const me = await request({ url: `${API}/me`, headers: await this.headers() });
 			this.workspaceId = (
 				me.json as { default_workspace_id: number }
 			).default_workspace_id;
@@ -46,7 +53,7 @@ export class Toggl {
 		taskId: number | null = null,
 	): Promise<TimeEntry> {
 		const wid = await this.workspace();
-		const res = await requestUrl({
+		const res = await request({
 			url: `${API}/workspaces/${wid}/time_entries`,
 			method: "POST",
 			headers: await this.headers(),
@@ -67,7 +74,7 @@ export class Toggl {
 	/** Creates a Toggl task (paid plans) in a project; returns its id. */
 	async createTask(projectId: number, name: string): Promise<number> {
 		const wid = await this.workspace();
-		const res = await requestUrl({
+		const res = await request({
 			url: `${API}/workspaces/${wid}/projects/${projectId}/tasks`,
 			method: "POST",
 			headers: await this.headers(),
@@ -82,7 +89,7 @@ export class Toggl {
 	 */
 	async projectTaskSeconds(projectId: number): Promise<Map<number, number>> {
 		const wid = await this.workspace();
-		const res = await requestUrl({
+		const res = await request({
 			url: `${API}/workspaces/${wid}/projects/${projectId}/tasks`,
 			headers: await this.headers(),
 		});
@@ -94,7 +101,7 @@ export class Toggl {
 
 	/** The running entry, or null. A `/me` request: 30 per hour per user on every plan. */
 	async current(): Promise<TimeEntry | null> {
-		const res = await requestUrl({
+		const res = await request({
 			url: `${API}/me/time_entries/current`,
 			headers: await this.headers(),
 		});

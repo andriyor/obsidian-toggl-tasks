@@ -204,14 +204,37 @@ export default class TogglTasksPlugin extends Plugin {
 		}
 	}
 
-	/** Adds the Toggl task reference to the first line equal to `line`. */
+	/**
+	 * Adds the Toggl task reference to the first line equal to `line`. An open
+	 * note is edited through its editor: a disk write would be overwritten by the
+	 * editor's next save of unsaved changes, and the next start would create a
+	 * duplicate Toggl task, which Toggl rejects.
+	 */
 	private async writeRef(file: TFile, line: string, ref: TaskRef): Promise<void> {
-		await this.app.vault.process(file, (text) => {
-			const lines = text.split("\n");
-			const i = lines.indexOf(line);
-			if (i >= 0) lines[i] = setTaskRef(line, ref);
-			return lines.join("\n");
-		});
+		const editor = this.app.workspace
+			.getLeavesOfType("markdown")
+			.map((leaf) => leaf.view)
+			.find((view) => view instanceof MarkdownView && view.file === file) as
+			MarkdownView | undefined;
+		let found = false;
+		if (editor) {
+			const { editor: e } = editor;
+			for (let i = 0; i < e.lineCount() && !found; i++) {
+				if (e.getLine(i) !== line) continue;
+				e.setLine(i, setTaskRef(line, ref));
+				found = true;
+			}
+		} else {
+			await this.app.vault.process(file, (text) => {
+				const lines = text.split("\n");
+				const i = lines.indexOf(line);
+				found = i >= 0;
+				if (found) lines[i] = setTaskRef(line, ref);
+				return lines.join("\n");
+			});
+		}
+		if (!found)
+			new Notice(`Toggl: task line changed, add [toggl_task:: ${formatRef(ref)}] to it`);
 	}
 
 	private async projectName(id: number): Promise<string | null> {
