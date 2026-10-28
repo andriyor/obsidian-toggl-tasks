@@ -31,7 +31,8 @@ class PlayWidget extends WidgetType {
 			cls: "toggl-tasks-start",
 			attr: { "aria-label": "Start Toggl timer", role: "button" },
 		});
-		setIcon(button.createSpan({ cls: "toggl-tasks-start-icon" }), "play");
+		// A power symbol in a circle, like the Toggl Track extension's button.
+		setIcon(button.createSpan({ cls: "toggl-tasks-start-icon" }), "power");
 		if (this.time) button.createSpan({ text: this.time });
 		// mousedown, not click: keeps the cursor where it is.
 		button.addEventListener("mousedown", (e) => {
@@ -47,7 +48,7 @@ class PlayWidget extends WidgetType {
 	}
 }
 
-/** ▶ at the end of every open task line in the visible part of the editor. */
+/** Start button at the end of every open task line in the visible part of the editor. */
 export function startButtons(onStart: StartHandler) {
 	const build = (view: EditorView): DecorationSet => {
 		const builder = new RangeSetBuilder<Decoration>();

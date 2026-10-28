@@ -21,7 +21,7 @@ Desktop only, Obsidian 1.13 or later.
 
 ### For a task
 
-Press the **▶** pill at the end of an open task (Live Preview and source mode), or run **Start timer for task on current line**.
+Press the pink power button, like the Toggl Track extension's, at the end of an open task (Live Preview and source mode), or run **Start timer for task on current line**.
 
 | Timer field | Comes from                                                                                                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -75,7 +75,7 @@ Totals under a minute are not written, and a running timer is counted only after
 
 The ribbon icon or **Show running timer** opens a sidebar view with the running timer's description, project and elapsed time, plus **Start note**, **Sync note** and **Refresh** buttons.
 
-- A timer started with ▶ shows up immediately.
+- A timer started from the plugin shows up immediately.
 - Otherwise the view polls `/me/time_entries/current` every 5 minutes, only while it is visible and Obsidian is focused: `/me` requests are limited to 30 per hour per user. A timer stopped in the Toggl app can take up to 5 minutes to disappear, or press **Refresh**.
 
 ## Design decisions
