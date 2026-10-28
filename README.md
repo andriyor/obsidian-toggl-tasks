@@ -2,7 +2,9 @@
 
 Obsidian plugin that starts [Toggl Track](https://toggl.com/track/) timers from task lines and writes the tracked time back into the note.
 
-Toggl stays the source of truth: timers are stopped in the Toggl apps, and the plugin reads the totals back from the Toggl API.
+The note is the single place a task is written. Like the [Toggl Track browser extension](https://github.com/toggl/track-extension), which adds a timer button to tools such as GitHub and Jira, the plugin starts a timer from the task itself, so task and project names are never copied into Toggl by hand.
+
+For time, Toggl stays the source of truth: timers are stopped in the Toggl apps, and the plugin reads the totals back from the Toggl API.
 
 Desktop only, Obsidian 1.13 or later.
 
