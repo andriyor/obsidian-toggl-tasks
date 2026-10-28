@@ -10,12 +10,12 @@ Desktop only, Obsidian 1.13 or later.
 
 ## Setup
 
-| Setting            | Description                                                                                                                         |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| API token          | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.                              |
-| Projects file      | Vault path of a JSON file `{ "project name": id }`                                                                                  |
-| Tags URL           | Optional. Returns `[{ "id": 123 }, …]`.                                                                                             |
-| Priority tags file | Optional. Vault path of a JSON file `{ "p:highest 🔺": id, "p:high ⏫": id, "p:medium 🔼": id, "p:low 🔽": id, "p:lowest ⏬": id }` |
+| Setting            | Description                                                                                                                                                                                                     |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API token          | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.                                                                                                          |
+| Projects file      | Vault path of a JSON file `{ "project name": id }`                                                                                                                                                              |
+| Tags URL           | Optional. Returns `[{ "id": 123 }, …]`.                                                                                                                                                                         |
+| Priority tags file | Optional. Vault path of a JSON file `{ "p:highest 🔺": id, "p:high ⏫": id, "p:medium 🔼": id, "p:low 🔽": id, "p:lowest ⏬": id }`; a value can also be `{ "id": id, "desc": "…" }`, see [Priority](#priority) |
 
 ## Start a timer
 
@@ -50,6 +50,18 @@ With a priority tags file set, every timer gets at most one priority tag. Priori
 3. Otherwise you pick one from the file's tags, and the choice is saved as `toggl_priority`. Pick **none** to save `toggl_priority: none`, so the note's timers get no priority tag and it doesn't ask again. Esc starts this timer without a priority and saves nothing.
 
 A task without an emoji is "normal" in Tasks, but here it takes the note's priority instead.
+
+To decide by your values rather than by urgency, give each tag a `desc`. The picker shows it under the tag name and searches it, so typing "health" finds the right level:
+
+```json
+{
+	"p:highest 🔺": { "id": 1, "desc": "can't wait: a health problem, a deadline today" },
+	"p:high ⏫": { "id": 2, "desc": "keeps life running: health, sleep, home, core work" },
+	"p:medium 🔼": { "id": 3, "desc": "builds the long term: learning, reading" },
+	"p:low 🔽": { "id": 4, "desc": "new and optional: side projects, exploring tools" },
+	"p:lowest ⏬": { "id": 5, "desc": "only spends time: feeds, reels" }
+}
+```
 
 ### For a whole note
 

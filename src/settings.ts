@@ -51,7 +51,7 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Priority tags file",
-				desc: 'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, added for the task\'s priority emoji.',
+				desc: 'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, or to { id, desc } with a description shown when picking a note\'s priority.',
 				control: {
 					type: "file",
 					key: "priorityTagsPath",

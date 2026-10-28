@@ -37,6 +37,13 @@ interface Project {
 	id: number;
 }
 
+interface PriorityTag {
+	name: string;
+	id: number;
+	/** Shown under the name in the priority picker, e.g. what counts as high. */
+	desc?: string;
+}
+
 export default class TogglTasksPlugin extends Plugin {
 	settings: Settings = DEFAULT_SETTINGS;
 	private toggl = new Toggl(() => this.readToken());
@@ -164,10 +171,10 @@ export default class TogglTasksPlugin extends Plugin {
 				}
 			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
-			const priorityTags = await this.loadIds(this.settings.priorityTagsPath);
+			const priorityTags = await this.loadPriorityTags();
 			// The entry gets one priority tag, from the task or note, so drop any the
 			// tags URL returns.
-			const priorityIds = new Set(Object.values(priorityTags));
+			const priorityIds = new Set(priorityTags.map((t) => t.id));
 			const tagIds = (await fetchTagIds(this.settings.tagsUrl)).filter(
 				(id) => !priorityIds.has(id),
 			);
@@ -197,29 +204,33 @@ export default class TogglTasksPlugin extends Plugin {
 	private async priorityTagId(
 		file: TFile | null,
 		priority: string | null,
-		tags: Record<string, number>,
+		tags: PriorityTag[],
 	): Promise<number | null> {
-		const names = Object.keys(tags);
-		if (!names.length) return null;
-		const name = priority ?? (file ? await this.notePriority(file, names) : null);
+		if (!tags.length) return null;
+		const name = priority ?? (file ? await this.notePriority(file, tags) : null);
 		if (!name || name === NO_PRIORITY) return null;
-		if (!tags[name])
+		const tag = tags.find((t) => t.name === name);
+		if (!tag)
 			new Notice(`Toggl: tag "${name}" is not in ${this.settings.priorityTagsPath}`);
-		return tags[name] ?? null;
+		return tag?.id ?? null;
 	}
 
 	/**
-	 * The note's `toggl_priority`, else a choice from `names` saved as
-	 * `toggl_priority` ("none" saves no priority; Esc = none, saves nothing).
+	 * The note's `toggl_priority`, else a choice from `tags`, shown with their
+	 * descriptions and saved as `toggl_priority` ("none" saves no priority; Esc =
+	 * none, saves nothing).
 	 */
-	private async notePriority(file: TFile, names: string[]): Promise<string | null> {
+	private async notePriority(file: TFile, tags: PriorityTag[]): Promise<string | null> {
 		const saved = this.noteProperty(file, PRIORITY_PROPERTY);
 		if (typeof saved === "string") return saved;
+		const descs = new Map(tags.map((t) => [t.name, t.desc]));
+		descs.set(NO_PRIORITY, "No priority tag, and this note doesn't ask again");
 		const picked = await new PickModal(
 			this.app,
-			[...names, NO_PRIORITY],
-			(n) => n,
+			[...descs.keys()],
+			(name) => name,
 			"Toggl priority (Esc = none this time)",
+			(name) => descs.get(name),
 		).choose();
 		if (picked) {
 			await this.app.fileManager.processFrontMatter(
@@ -328,14 +339,24 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	private async loadProjects(): Promise<Project[]> {
-		const map = await this.loadIds(this.settings.projectsPath);
+		const map = await this.loadJson<number>(this.settings.projectsPath);
 		return Object.entries(map).map(([name, id]) => ({ name, id }));
 	}
 
-	/** A `{ "name": id }` JSON file in the vault; empty when unset or missing. */
-	private async loadIds(path: string): Promise<Record<string, number>> {
+	/** The priority tags file: each tag name maps to an id or `{ id, desc }`. */
+	private async loadPriorityTags(): Promise<PriorityTag[]> {
+		const map = await this.loadJson<number | Omit<PriorityTag, "name">>(
+			this.settings.priorityTagsPath,
+		);
+		return Object.entries(map).map(([name, value]) =>
+			typeof value === "number" ? { name, id: value } : { name, ...value },
+		);
+	}
+
+	/** A `{ "name": value }` JSON file in the vault; empty when unset or missing. */
+	private async loadJson<V>(path: string): Promise<Record<string, V>> {
 		if (!path || !(await this.app.vault.adapter.exists(path))) return {};
-		return JSON.parse(await this.app.vault.adapter.read(path)) as Record<string, number>;
+		return JSON.parse(await this.app.vault.adapter.read(path)) as Record<string, V>;
 	}
 
 	/**
