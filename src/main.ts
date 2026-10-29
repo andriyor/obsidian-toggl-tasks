@@ -62,7 +62,7 @@ export default class TogglTasksPlugin extends Plugin {
 					projectName: (id) => this.projectName(id),
 					syncNote: () => this.syncActiveNote(),
 					startNote: () => this.startNoteTimer(),
-					pinnedProjects: async () => (await this.loadProjects()).filter((p) => p.pinned),
+					pinnedProjects: () => this.projects().filter((p) => p.pinned),
 					startProject: (project) => this.startProjectTimer(project),
 				}),
 		);
@@ -95,6 +95,12 @@ export default class TogglTasksPlugin extends Plugin {
 			editorCallback: (editor, ctx) => {
 				void this.startTimer(editor.getLine(editor.getCursor().line), ctx.file);
 			},
+		});
+
+		this.addCommand({
+			id: "update-projects",
+			name: "Update projects from Toggl",
+			callback: () => void this.updateProjects(),
 		});
 
 		this.addCommand({
@@ -186,7 +192,7 @@ export default class TogglTasksPlugin extends Plugin {
 					projectName = project.name;
 				}
 			}
-			projectName ??= ref ? await this.projectName(ref.projectId) : null;
+			projectName ??= ref ? this.projectName(ref.projectId) : null;
 			const priorityId = await this.priorityTagId(
 				file,
 				priority,
@@ -224,7 +230,7 @@ export default class TogglTasksPlugin extends Plugin {
 		if (priorityId) tagIds.push(priorityId);
 		const entry = await this.toggl.start(description, projectId, tagIds, taskId);
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
-			if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
+			if (leaf.view instanceof RunningTimerView) leaf.view.show(entry);
 		}
 		new Notice(
 			`Toggl started: ${description || "(no description)"} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
@@ -310,8 +316,8 @@ export default class TogglTasksPlugin extends Plugin {
 			new Notice(`Toggl: task line changed, add [toggl_task:: ${formatRef(ref)}] to it`);
 	}
 
-	private async projectName(id: number): Promise<string | null> {
-		return (await this.loadProjects()).find((p) => p.id === id)?.name ?? null;
+	private projectName(id: number): string | null {
+		return this.projects().find((p) => p.id === id)?.name ?? null;
 	}
 
 	/**
@@ -337,16 +343,18 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * The note's `toggl_project`, else a choice from the projects file (Esc = none)
+	 * The note's `toggl_project`, else a choice from the projects (Esc = none)
 	 * that is saved as the note's `toggl_project`.
 	 */
 	private async pickProject(file: TFile | null): Promise<Project | null> {
-		const projects = await this.loadProjects();
+		const projects = this.projects();
 		const wanted = file ? this.noteProperty(file, PROJECT_PROPERTY) : undefined;
 		if (typeof wanted === "string") {
 			const project = projects.find((p) => p.name === wanted);
 			if (!project)
-				new Notice(`Toggl: project "${wanted}" is not in ${this.settings.projectsPath}`);
+				new Notice(
+					`Toggl: project "${wanted}" not found, run "Update projects from Toggl"`,
+				);
 			return project ?? null;
 		}
 		if (!projects.length) return null;
@@ -372,10 +380,31 @@ export default class TogglTasksPlugin extends Plugin {
 		return this.app.metadataCache.getFileCache(file)?.frontmatter?.[name];
 	}
 
-	/** The projects file: `{ "name": { "id": 123, "pinned": true } }`. */
-	private async loadProjects(): Promise<Project[]> {
-		const map = await this.loadJson<Omit<Project, "name">>(this.settings.projectsPath);
-		return Object.entries(map).map(([name, value]) => ({ name, ...value }));
+	/** The projects saved by `updateProjects`, sorted by name. */
+	private projects(): Project[] {
+		return Object.entries(this.settings.projects).map(([name, value]) => ({
+			name,
+			...value,
+		}));
+	}
+
+	/** Saves Toggl's active projects to the plugin data, sorted by name. */
+	async updateProjects(): Promise<void> {
+		try {
+			const projects = (await this.toggl.projects()).sort((a, b) =>
+				a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+			);
+			this.settings.projects = Object.fromEntries(
+				projects.map(({ name, id, pinned }) => [name, { id, pinned }]),
+			);
+			await this.saveData(this.settings);
+			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
+				if (leaf.view instanceof RunningTimerView) leaf.view.render();
+			}
+			new Notice(`Toggl: ${projects.length} projects updated`);
+		} catch (e) {
+			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
 	}
 
 	/** The priority tags file: each tag name maps to an id or `{ id, desc }`. */

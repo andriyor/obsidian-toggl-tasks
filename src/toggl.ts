@@ -99,6 +99,26 @@ export class Toggl {
 		return new Map(tasks.map((t) => [t.id, Math.round(t.tracked_seconds / 1000)]));
 	}
 
+	/**
+	 * Active projects. `/me/projects` returns all of them unpaginated, unlike
+	 * `/workspaces/{id}/projects`, which cuts off at the first page.
+	 */
+	async projects(): Promise<{ name: string; id: number; pinned: boolean }[]> {
+		const res = await request({
+			url: `${API}/me/projects`,
+			headers: await this.headers(),
+		});
+		const projects = (res.json ?? []) as {
+			name: string;
+			id: number;
+			pinned: boolean;
+			active: boolean;
+		}[];
+		return projects
+			.filter((p) => p.active)
+			.map(({ name, id, pinned }) => ({ name, id, pinned }));
+	}
+
 	/** The running entry, or null. A `/me` request: 30 per hour per user on every plan. */
 	async current(): Promise<TimeEntry | null> {
 		const res = await request({

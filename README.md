@@ -13,9 +13,12 @@ Desktop only, Obsidian 1.13 or later.
 | Setting            | Description                                                                                                                                                                                                     |
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API token          | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.                                                                                                          |
-| Projects file      | Vault path of a JSON file `{ "project name": { "id": 123, "pinned": true } }`; `pinned` mirrors Toggl's pinned projects, see [Pinned projects](#pinned-projects)                                                |
 | Tags URL           | Optional. Returns `[{ "id": 123 }, …]`.                                                                                                                                                                         |
 | Priority tags file | Optional. Vault path of a JSON file `{ "p:highest 🔺": id, "p:high ⏫": id, "p:medium 🔼": id, "p:low 🔽": id, "p:lowest ⏬": id }`; a value can also be `{ "id": id, "desc": "…" }`, see [Priority](#priority) |
+
+### Projects
+
+Run **Update projects from Toggl**, from the command palette or by clicking it in the plugin settings, once, and again after adding, renaming or pinning projects in Toggl. It saves the active projects, sorted by name, with their ids and whether they are pinned, to the plugin's `data.json`.
 
 ## Start a timer
 
@@ -26,7 +29,7 @@ Press the pink power button, like the Toggl Track extension's, at the end of an 
 | Timer field | Comes from                                                                                                                                                                      |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets                                                                             |
-| Project     | The note's `toggl_project` property, looked up by name in the projects file                                                                                                     |
+| Project     | The note's `toggl_project` property, looked up by name in the projects (see [Projects](#projects))                                                                              |
 | Tags        | Tag ids returned by the tags URL, if set, plus a priority tag (see [Priority](#priority)): 🔺 `p:highest 🔺`, ⏫ `p:high ⏫`, 🔼 `p:medium 🔼`, 🔽 `p:low 🔽`, ⏬ `p:lowest ⏬` |
 | Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                                                                                                 |
 
@@ -69,7 +72,7 @@ Press **Start note** in the running timer view or run **Start timer for current 
 
 ### For a pinned project
 
-The running timer view lists the projects with `"pinned": true` in the projects file. Click one to start a timer with only that project: no description, Toggl task or priority tag, just the tags URL's tags. It is for time that has no note, like calls or eating, so it is not synced to any note.
+The running timer view lists the projects pinned in Toggl. Click one to start a timer with only that project: no description, Toggl task or priority tag, just the tags URL's tags. It is for time that has no note, like calls or eating, so it is not synced to any note.
 
 ## Tracked time
 
@@ -102,7 +105,7 @@ The ribbon icon or **Show running timer** opens a sidebar view with the running 
 - **`tracked_seconds` is in milliseconds.** Despite the name, a 60 s entry reports `60000`; the plugin divides by 1000.
 - **`toggl_hours` is a decimal number, not `h:mm`.** A number can be summed and compared in Dataview and Bases queries; an `h:mm` string cannot. Task lines use `h:mm` because they are read, not queried.
 - **Inline fields go before Tasks metadata.** The Tasks plugin only parses emoji fields at the end of the line; appending `[toggl:: …]` after `📅 …` would turn the dates into description text.
-- **Projects come from a hand-kept JSON file.** Projects rarely change, and a local name → id map avoids an API call per start. `GET /me/projects` returns all of them unpaginated, unlike `/workspaces/{id}/projects`, which cuts off at the first page, and includes each project's `pinned`. Every project is `{ id, pinned }`, not a bare id for unpinned ones, since the file is generated and one shape is simpler to read. A picked project is saved per note as `toggl_project`.
+- **Projects are saved in the plugin data, refreshed by a command.** Projects rarely change, and a local name → id map avoids an API call per start. `GET /me/projects` returns all of them unpaginated, unlike `/workspaces/{id}/projects`, which cuts off at the first page, and includes each project's `pinned`. A picked project is saved per note as `toggl_project`.
 - **Priority is a tag.** Toggl time entries and tasks have no priority field. The tag is set when a timer starts, so an entry keeps the priority the task had while it was worked on, and reports can be filtered by it. Tags are created once in Toggl and mapped by name in a JSON file, like projects, so starting a timer needs no tag lookup.
 - **Token in `.env`, not in plugin settings.** Plugin `data.json` can end up in git when a vault is versioned; `.env` stays out of it and can be shared with other Toggl scripts. Obsidian's secret storage is a todo.
 - **The task reference is written through the open editor.** Writing it to the file on disk while the note has unsaved edits gets overwritten by the editor's next save; the line then has no reference, and the next start tries to create the same Toggl task again, which Toggl rejects with 400.

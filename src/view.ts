@@ -13,9 +13,9 @@ export interface RunningTimerSource {
 	syncNote(): Promise<void>;
 	/** Starts a project timer for the note last open in the editor. */
 	startNote(): Promise<void>;
-	projectName(id: number): Promise<string | null>;
-	/** Projects pinned in Toggl, from the projects file. */
-	pinnedProjects(): Promise<Project[]>;
+	projectName(id: number): string | null;
+	/** Projects pinned in Toggl, as of the last "Update projects from Toggl". */
+	pinnedProjects(): Project[];
 	/** Starts a timer with only a project. */
 	startProject(project: Project): Promise<void>;
 }
@@ -27,7 +27,6 @@ export interface RunningTimerSource {
 export class RunningTimerView extends ItemView {
 	private entry: TimeEntry | null = null;
 	private project: string | null = null;
-	private pinned: Project[] = [];
 	private error: string | null = null;
 	private checkedAt = 0;
 	private elapsedEl: HTMLElement | null = null;
@@ -63,9 +62,7 @@ export class RunningTimerView extends ItemView {
 
 	async refresh(): Promise<void> {
 		try {
-			// A local file read, so the list follows a rerun of the projects script.
-			this.pinned = await this.source.pinnedProjects();
-			await this.show(await this.source.current());
+			this.show(await this.source.current());
 			this.error = null;
 		} catch (e) {
 			this.error = e instanceof Error ? e.message : String(e);
@@ -74,16 +71,17 @@ export class RunningTimerView extends ItemView {
 	}
 
 	/** Shows an entry already known, e.g. one just started, without a request. */
-	async show(entry: TimeEntry | null): Promise<void> {
+	show(entry: TimeEntry | null): void {
 		this.entry = entry && entry.duration < 0 ? entry : null;
 		this.project = this.entry?.project_id
-			? await this.source.projectName(this.entry.project_id)
+			? this.source.projectName(this.entry.project_id)
 			: null;
 		this.checkedAt = Date.now();
 		this.render();
 	}
 
-	private render(): void {
+	/** Public so "Update projects from Toggl" can redraw the pinned projects. */
+	render(): void {
 		const root = this.contentEl;
 		root.empty();
 		root.addClass("toggl-tasks-running");
@@ -121,9 +119,10 @@ export class RunningTimerView extends ItemView {
 			.createEl("button", { text: "Refresh" })
 			.addEventListener("click", () => void this.refresh());
 
-		if (this.pinned.length) {
+		const pinned = this.source.pinnedProjects();
+		if (pinned.length) {
 			const list = root.createDiv({ cls: "toggl-tasks-pinned" });
-			for (const project of this.pinned) {
+			for (const project of pinned) {
 				const row = list.createDiv({
 					cls: "toggl-tasks-pinned-project",
 					attr: { "aria-label": `Start Toggl timer in ${project.name}`, role: "button" },
