@@ -6,7 +6,7 @@ export const ENV_FILE = ".env";
 export const PROJECT_PROPERTY = "toggl_project";
 
 export interface Settings {
-	/** Vault path of a `{ "project name": id }` JSON file. */
+	/** Vault path of a `{ "project name": { id, pinned } }` JSON file. */
 	projectsPath: string;
 	/** URL returning `[{ id }]` of tags to attach to every new timer. */
 	tagsUrl: string;
@@ -32,7 +32,7 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Projects file",
-				desc: `Vault path of a JSON file mapping project names to ids. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting.`,
+				desc: `Vault path of a JSON file mapping project names to { id, pinned }. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting. Pinned projects are listed in the running timer view.`,
 				control: {
 					type: "file",
 					key: "projectsPath",

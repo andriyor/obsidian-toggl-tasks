@@ -32,9 +32,11 @@ const PRIORITY_PROPERTY = "toggl_priority";
 /** `toggl_priority` value for a note whose timers get no priority tag. */
 const NO_PRIORITY = "none";
 
-interface Project {
+export interface Project {
 	name: string;
 	id: number;
+	/** Pinned in Toggl; listed in the running timer view. */
+	pinned: boolean;
 }
 
 interface PriorityTag {
@@ -60,6 +62,8 @@ export default class TogglTasksPlugin extends Plugin {
 					projectName: (id) => this.projectName(id),
 					syncNote: () => this.syncActiveNote(),
 					startNote: () => this.startNoteTimer(),
+					pinnedProjects: async () => (await this.loadProjects()).filter((p) => p.pinned),
+					startProject: (project) => this.startProjectTimer(project),
 				}),
 		);
 		this.addRibbonIcon(
@@ -145,6 +149,18 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
+	 * Starts a timer with only a project: no description, Toggl task or priority,
+	 * for time that has no note, like calls or eating.
+	 */
+	async startProjectTimer(project: Project): Promise<void> {
+		try {
+			await this.startEntry("", project.id, null, project.name, null);
+		} catch (e) {
+			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	/**
 	 * Starts the entry with the current tags plus the `priority` tag, and shows
 	 * it in the running timer view. Without a `ref`, picks the note's project and
 	 * creates a Toggl task there, handing it to `save`; Esc in the picker starts
@@ -171,30 +187,48 @@ export default class TogglTasksPlugin extends Plugin {
 				}
 			}
 			projectName ??= ref ? await this.projectName(ref.projectId) : null;
-			const priorityTags = await this.loadPriorityTags();
-			// The entry gets one priority tag, from the task or note, so drop any the
-			// tags URL returns.
-			const priorityIds = new Set(priorityTags.map((t) => t.id));
-			const tagIds = (await fetchTagIds(this.settings.tagsUrl)).filter(
-				(id) => !priorityIds.has(id),
+			const priorityId = await this.priorityTagId(
+				file,
+				priority,
+				await this.loadPriorityTags(),
 			);
-			const priorityId = await this.priorityTagId(file, priority, priorityTags);
-			if (priorityId) tagIds.push(priorityId);
-			const entry = await this.toggl.start(
+			await this.startEntry(
 				description,
 				ref?.projectId ?? null,
-				tagIds,
 				ref?.taskId ?? null,
-			);
-			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
-				if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
-			}
-			new Notice(
-				`Toggl started: ${description} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
+				projectName,
+				priorityId,
 			);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
+	}
+
+	/**
+	 * Starts the entry with the tags URL's tags plus `priorityId`, and shows it
+	 * in the running timer view.
+	 */
+	private async startEntry(
+		description: string,
+		projectId: number | null,
+		taskId: number | null,
+		projectName: string | null,
+		priorityId: number | null,
+	): Promise<void> {
+		// The entry gets at most one priority tag, from the task or note, so drop
+		// any the tags URL returns.
+		const priorityIds = new Set((await this.loadPriorityTags()).map((t) => t.id));
+		const tagIds = (await fetchTagIds(this.settings.tagsUrl)).filter(
+			(id) => !priorityIds.has(id),
+		);
+		if (priorityId) tagIds.push(priorityId);
+		const entry = await this.toggl.start(description, projectId, tagIds, taskId);
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
+			if (leaf.view instanceof RunningTimerView) void leaf.view.show(entry);
+		}
+		new Notice(
+			`Toggl started: ${description || "(no description)"} [${projectName ?? "no project"}] (${tagIds.length} tags)`,
+		);
 	}
 
 	/**
@@ -338,9 +372,10 @@ export default class TogglTasksPlugin extends Plugin {
 		return this.app.metadataCache.getFileCache(file)?.frontmatter?.[name];
 	}
 
+	/** The projects file: `{ "name": { "id": 123, "pinned": true } }`. */
 	private async loadProjects(): Promise<Project[]> {
-		const map = await this.loadJson<number>(this.settings.projectsPath);
-		return Object.entries(map).map(([name, id]) => ({ name, id }));
+		const map = await this.loadJson<Omit<Project, "name">>(this.settings.projectsPath);
+		return Object.entries(map).map(([name, value]) => ({ name, ...value }));
 	}
 
 	/** The priority tags file: each tag name maps to an id or `{ id, desc }`. */

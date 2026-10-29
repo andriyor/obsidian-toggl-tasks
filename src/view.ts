@@ -1,4 +1,5 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
+import { ItemView, setIcon, WorkspaceLeaf } from "obsidian";
+import type { Project } from "./main";
 import type { TimeEntry } from "./toggl";
 
 export const VIEW_TYPE_RUNNING = "toggl-tasks-running";
@@ -13,6 +14,10 @@ export interface RunningTimerSource {
 	/** Starts a project timer for the note last open in the editor. */
 	startNote(): Promise<void>;
 	projectName(id: number): Promise<string | null>;
+	/** Projects pinned in Toggl, from the projects file. */
+	pinnedProjects(): Promise<Project[]>;
+	/** Starts a timer with only a project. */
+	startProject(project: Project): Promise<void>;
 }
 
 /**
@@ -22,6 +27,7 @@ export interface RunningTimerSource {
 export class RunningTimerView extends ItemView {
 	private entry: TimeEntry | null = null;
 	private project: string | null = null;
+	private pinned: Project[] = [];
 	private error: string | null = null;
 	private checkedAt = 0;
 	private elapsedEl: HTMLElement | null = null;
@@ -57,6 +63,8 @@ export class RunningTimerView extends ItemView {
 
 	async refresh(): Promise<void> {
 		try {
+			// A local file read, so the list follows a rerun of the projects script.
+			this.pinned = await this.source.pinnedProjects();
 			await this.show(await this.source.current());
 			this.error = null;
 		} catch (e) {
@@ -112,6 +120,19 @@ export class RunningTimerView extends ItemView {
 		buttons
 			.createEl("button", { text: "Refresh" })
 			.addEventListener("click", () => void this.refresh());
+
+		if (this.pinned.length) {
+			const list = root.createDiv({ cls: "toggl-tasks-pinned" });
+			for (const project of this.pinned) {
+				const row = list.createDiv({
+					cls: "toggl-tasks-pinned-project",
+					attr: { "aria-label": `Start Toggl timer in ${project.name}`, role: "button" },
+				});
+				setIcon(row.createSpan({ cls: "toggl-tasks-start-icon" }), "power");
+				row.createSpan({ text: project.name });
+				row.addEventListener("click", () => void this.source.startProject(project));
+			}
+		}
 	}
 
 	private tick(): void {
