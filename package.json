@@ -9,7 +9,7 @@
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
 		"typecheck": "tsc --noEmit --skipLibCheck",
-		"test": "node --test --experimental-strip-types test/task.test.mts",
+		"test": "node --test --experimental-strip-types test/*.test.mts",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",

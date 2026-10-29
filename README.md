@@ -72,7 +72,7 @@ Press **Start note** in the running timer view or run **Start timer for current 
 
 ### For a pinned project
 
-The running timer view lists the projects pinned in Toggl. Click one to start a timer with only that project: no description, Toggl task or priority tag, just the tags URL's tags. It is for time that has no note, like calls or eating, so it is not synced to any note.
+The running timer view lists the projects pinned in Toggl, in the order set by dragging them under **Pinned projects** in the plugin settings; newly pinned ones go last. Click one to start a timer with only that project: no description, Toggl task or priority tag, just the tags URL's tags. It is for time that has no note, like calls or eating, so it is not synced to any note.
 
 ## Tracked time
 

@@ -2,6 +2,7 @@ import { EditorView } from "@codemirror/view";
 import { editorInfoField, MarkdownView, Notice, Plugin, TFile } from "obsidian";
 import { startButtons } from "./button";
 import { PickModal } from "./pick";
+import { movePinned, sortPinned } from "./pinned";
 import {
 	DEFAULT_SETTINGS,
 	ENV_FILE,
@@ -62,7 +63,7 @@ export default class TogglTasksPlugin extends Plugin {
 					projectName: (id) => this.projectName(id),
 					syncNote: () => this.syncActiveNote(),
 					startNote: () => this.startNoteTimer(),
-					pinnedProjects: () => this.projects().filter((p) => p.pinned),
+					pinnedProjects: () => this.pinnedProjects(),
 					startProject: (project) => this.startProjectTimer(project),
 				}),
 		);
@@ -398,12 +399,28 @@ export default class TogglTasksPlugin extends Plugin {
 				projects.map(({ name, id, pinned }) => [name, { id, pinned }]),
 			);
 			await this.saveData(this.settings);
-			for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
-				if (leaf.view instanceof RunningTimerView) leaf.view.render();
-			}
+			this.renderRunningViews();
 			new Notice(`Toggl: ${projects.length} projects updated`);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	/** Projects pinned in Toggl, in the order set in the plugin settings. */
+	pinnedProjects(): Project[] {
+		return sortPinned(this.projects(), this.settings.pinnedOrder);
+	}
+
+	/** Moves a pinned project from index `from` to `to` of `pinnedProjects`. */
+	async movePinnedProject(from: number, to: number): Promise<void> {
+		this.settings.pinnedOrder = movePinned(this.pinnedProjects(), from, to);
+		await this.saveData(this.settings);
+		this.renderRunningViews();
+	}
+
+	private renderRunningViews(): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
+			if (leaf.view instanceof RunningTimerView) leaf.view.render();
 		}
 	}
 

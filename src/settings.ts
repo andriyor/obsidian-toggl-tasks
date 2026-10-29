@@ -9,6 +9,8 @@ export const PROJECT_PROPERTY = "toggl_project";
 export interface Settings {
 	/** `{ "project name": { id, pinned } }`, written by "Update projects from Toggl". */
 	projects: Record<string, { id: number; pinned: boolean }>;
+	/** Ids of pinned projects in the order the running timer view lists them. */
+	pinnedOrder: number[];
 	/** URL returning `[{ id }]` of tags to attach to every new timer. */
 	tagsUrl: string;
 	/** Vault path of a `{ "p:high ⏫": id, … }` JSON file for task priorities. */
@@ -17,6 +19,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
 	projects: {},
+	pinnedOrder: [],
 	tagsUrl: "",
 	priorityTagsPath: "",
 };
@@ -42,6 +45,14 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 				name: "Update projects from Toggl",
 				desc: `${this.projectCount()} Click, or run the command of the same name, after changing projects in Toggl. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting. Pinned projects are listed in the running timer view.`,
 				action: () => void this.plugin.updateProjects().then(() => this.update()),
+			},
+			{
+				type: "list",
+				heading: "Pinned projects",
+				emptyState: "Pin projects in Toggl, then update projects from Toggl.",
+				items: this.plugin.pinnedProjects().map((p) => ({ name: p.name })),
+				onReorder: (from, to) =>
+					void this.plugin.movePinnedProject(from, to).then(() => this.update()),
 			},
 			{
 				name: "Tags URL",
