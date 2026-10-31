@@ -1,4 +1,5 @@
 import { requestUrl, RequestUrlParam, RequestUrlResponse } from "obsidian";
+import type { TaskRef } from "./task";
 
 const API = "https://api.track.toggl.com/api/v9";
 
@@ -20,6 +21,7 @@ export interface TimeEntry {
 interface ProjectTask {
 	id: number;
 	tracked_seconds: number;
+	active: boolean;
 }
 
 export class Toggl {
@@ -84,10 +86,12 @@ export class Toggl {
 	}
 
 	/**
-	 * All-time seconds per task id for one project, in a single request.
-	 * Running entries are not counted until stopped.
+	 * All-time seconds and active state per task id for one project, done tasks
+	 * included, in a single request. Running entries are not counted until stopped.
 	 */
-	async projectTaskSeconds(projectId: number): Promise<Map<number, number>> {
+	async projectTasks(
+		projectId: number,
+	): Promise<Map<number, { seconds: number; active: boolean }>> {
 		const wid = await this.workspace();
 		const res = await request({
 			url: `${API}/workspaces/${wid}/projects/${projectId}/tasks`,
@@ -96,7 +100,23 @@ export class Toggl {
 		const body = res.json as ProjectTask[] | { items: ProjectTask[] } | null;
 		const tasks = Array.isArray(body) ? body : (body?.items ?? []);
 		// tracked_seconds is in milliseconds despite its name (60 s entry → 60000).
-		return new Map(tasks.map((t) => [t.id, Math.round(t.tracked_seconds / 1000)]));
+		return new Map(
+			tasks.map((t) => [
+				t.id,
+				{ seconds: Math.round(t.tracked_seconds / 1000), active: t.active },
+			]),
+		);
+	}
+
+	/** Marks a Toggl task done (`active: false`) or reopens it. */
+	async setTaskActive(ref: TaskRef, active: boolean): Promise<void> {
+		const wid = await this.workspace();
+		await request({
+			url: `${API}/workspaces/${wid}/projects/${ref.projectId}/tasks/${ref.taskId}`,
+			method: "PUT",
+			headers: await this.headers(),
+			body: JSON.stringify({ active }),
+		});
 	}
 
 	/**

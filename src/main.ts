@@ -12,6 +12,7 @@ import {
 } from "./settings";
 import { fetchTagIds } from "./tags";
 import {
+	activeChanges,
 	formatRef,
 	formatSeconds,
 	parseRef,
@@ -443,36 +444,37 @@ export default class TogglTasksPlugin extends Plugin {
 	/**
 	 * Writes `[toggl:: h:mm]` to each task with a Toggl task and the sum, plus
 	 * the note's own `toggl_task`, to `toggl_hours`, with one request per
-	 * project. Tasks started without a project have no Toggl task and are left
-	 * as they are.
+	 * project, then marks Toggl tasks done or reopens them to match their lines.
+	 * Tasks started without a project have no Toggl task and are left as they are.
 	 */
 	async syncNote(file: TFile): Promise<void> {
-		const tasks = (await this.app.vault.read(file))
+		const lines = (await this.app.vault.read(file))
 			.split("\n")
-			.flatMap((line) => parseTask(line)?.ref ?? []);
+			.flatMap((line) => parseTask(line) ?? []);
+		const tasks = lines.flatMap((task) => task.ref ?? []);
 		const noteRef = parseRef(this.noteProperty(file, NOTE_TASK_PROPERTY));
 		if (!tasks.length && !noteRef) {
 			new Notice("Toggl: no tasks with a Toggl task in this note");
 			return;
 		}
-		const byTask = new Map<number, number>(); // Toggl task id → seconds
+		const byTask = new Map<number, { seconds: number; active: boolean }>();
 		try {
 			const refs = noteRef ? [...tasks, noteRef] : tasks;
 			for (const pid of new Set(refs.map((t) => t.projectId))) {
-				for (const [id, s] of await this.toggl.projectTaskSeconds(pid)) byTask.set(id, s);
+				for (const [id, t] of await this.toggl.projectTasks(pid)) byTask.set(id, t);
 			}
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 			return;
 		}
 
-		let total = noteRef ? (byTask.get(noteRef.taskId) ?? 0) : 0;
+		let total = noteRef ? (byTask.get(noteRef.taskId)?.seconds ?? 0) : 0;
 		await this.app.vault.process(file, (text) =>
 			text
 				.split("\n")
 				.map((line) => {
 					const ref = parseTask(line)?.ref;
-					const s = ref ? byTask.get(ref.taskId) : undefined;
+					const s = ref ? byTask.get(ref.taskId)?.seconds : undefined;
 					if (s === undefined) return line;
 					total += s;
 					return setTaskTime(line, s);
@@ -483,7 +485,25 @@ export default class TogglTasksPlugin extends Plugin {
 			if (total >= 60) fm[HOURS_PROPERTY] = Math.round((total / 3600) * 100) / 100;
 			else delete fm[HOURS_PROPERTY];
 		});
-		new Notice(`Toggl: ${tasks.length} tasks, ${formatSeconds(total)} total`);
+		// After the time is written, so a failure here doesn't lose it.
+		let done = 0;
+		let reopened = 0;
+		try {
+			for (const { ref, active } of activeChanges(lines, byTask)) {
+				await this.toggl.setTaskActive(ref, active);
+				if (active) reopened++;
+				else done++;
+			}
+		} catch (e) {
+			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+		const changes = [done && `${done} marked done`, reopened && `${reopened} reopened`]
+			.filter(Boolean)
+			.join(", ");
+		new Notice(
+			`Toggl: ${tasks.length} tasks, ${formatSeconds(total)} total` +
+				(changes ? `, ${changes}` : ""),
+		);
 	}
 
 	/** `TOGGL_API_TOKEN` from the vault's `.env`, shared with the vault scripts. */

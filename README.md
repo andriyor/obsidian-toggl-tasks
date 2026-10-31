@@ -88,6 +88,8 @@ Run **Update tracked time in current note**, or press **Sync note** in the sideb
 
 Totals come from the tasks' Toggl tasks: one request per project, all time, and renaming a task keeps its time. Tasks without a Toggl task are left as they are.
 
+Syncing also matches each Toggl task's state to its line: `[x]`, `[X]` and `[-]` mark it done in Toggl, and any other status reopens it. Each change is one more request, and only changed tasks are sent. If a recurring task's lines share a Toggl task, one open line keeps it active. A note's own `toggl_task` has no checkbox, so its state is not changed.
+
 Totals under a minute are not written, and a running timer is counted only after it stops.
 
 ## Running timer

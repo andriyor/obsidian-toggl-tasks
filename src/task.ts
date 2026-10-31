@@ -99,6 +99,27 @@ export function setTaskRef(line: string, ref: TaskRef): string {
 	return setField(line, REF_FIELD, formatRef(ref));
 }
 
+/**
+ * The Toggl tasks whose active state differs from the note. A recurring task's
+ * next line shares its ref, so one open line keeps the Toggl task active. Tasks
+ * Toggl did not return are skipped.
+ */
+export function activeChanges(
+	tasks: Pick<Task, "done" | "ref">[],
+	toggl: Map<number, { active: boolean }>,
+): { ref: TaskRef; active: boolean }[] {
+	const wanted = new Map<number, { ref: TaskRef; active: boolean }>();
+	for (const { done, ref } of tasks) {
+		if (!ref) continue;
+		const active = !done || (wanted.get(ref.taskId)?.active ?? false);
+		wanted.set(ref.taskId, { ref, active });
+	}
+	return [...wanted.values()].filter(({ ref, active }) => {
+		const current = toggl.get(ref.taskId)?.active;
+		return current !== undefined && current !== active;
+	});
+}
+
 /** Replaces or removes `[name:: value]`, keeping it before trailing Tasks metadata. */
 function setField(line: string, name: string, value: string | null): string {
 	const bare = line.replace(new RegExp(`\\s*\\[${name}:: [^\\]]*\\]`, "gu"), "");

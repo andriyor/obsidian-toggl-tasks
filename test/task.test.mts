@@ -1,12 +1,43 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 import {
+	activeChanges,
 	formatSeconds,
 	parseRef,
 	parseTask,
 	setTaskRef,
 	setTaskTime,
 } from "../src/task.ts";
+
+test("activeChanges returns tasks whose Toggl state differs from the note", () => {
+	const ref = (taskId: number) => ({ projectId: 1, taskId });
+	const toggl = new Map([
+		[1, { active: true }],
+		[2, { active: false }],
+		[3, { active: true }],
+		[4, { active: false }],
+		[5, { active: true }],
+	]);
+	assert.deepEqual(
+		activeChanges(
+			[
+				{ done: true, ref: ref(1) }, // done in the note: mark done
+				{ done: false, ref: ref(2) }, // reopened in the note
+				{ done: false, ref: ref(3) }, // already matches
+				{ done: true, ref: ref(4) }, // already matches
+				{ done: true, ref: ref(5) }, // recurring: the next line is open
+				{ done: false, ref: ref(5) },
+				{ done: true, ref: ref(6) }, // not returned by Toggl
+				{ done: true, ref: null },
+			],
+			toggl,
+		),
+		[
+			{ ref: ref(1), active: false },
+			{ ref: ref(2), active: true },
+		],
+	);
+});
 
 test("parseRef reads a note's toggl_task property", () => {
 	assert.deepEqual(parseRef(" 12/34 "), { projectId: 12, taskId: 34 });
