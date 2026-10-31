@@ -10,15 +10,18 @@ Desktop only, Obsidian 1.13 or later.
 
 ## Setup
 
-| Setting            | Description                                                                                                                                                                                                     |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API token          | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git.                                                                                                          |
-| Tags URL           | Optional. Returns `[{ "id": 123 }, …]`.                                                                                                                                                                         |
-| Priority tags file | Optional. Vault path of a JSON file `{ "p:highest 🔺": id, "p:high ⏫": id, "p:medium 🔼": id, "p:low 🔽": id, "p:lowest ⏬": id }`; a value can also be `{ "id": id, "desc": "…" }`, see [Priority](#priority) |
+| Setting   | Description                                                                                            |
+| --------- | ------------------------------------------------------------------------------------------------------ |
+| API token | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git. |
+| Tags URL  | Optional. Returns `[{ "id": 123 }, …]`.                                                                |
 
 ### Projects
 
 Run **Update projects from Toggl**, from the command palette or by clicking it in the plugin settings, once, and again after adding, renaming or pinning projects in Toggl. It saves the active projects, sorted by name, with their ids and whether they are pinned, to the plugin's `data.json`.
+
+### Tags
+
+Run **Update tags from Toggl** the same way, once and again after changing tags in Toggl. It saves the default workspace's tags to `data.json`. Then add what you want to be asked about under **Asked tags** in the settings: a category, which stands for all its tags, or a single tag without a category. Drag the list to set the order, and optionally give each tag a description. See [Asked tags](#asked-tags).
 
 ## Start a timer
 
@@ -26,12 +29,12 @@ Run **Update projects from Toggl**, from the command palette or by clicking it i
 
 Press the pink power button, like the Toggl Track extension's, at the end of an open task (Live Preview and source mode), or run **Start timer for task on current line**.
 
-| Timer field | Comes from                                                                                                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets                                                                             |
-| Project     | The note's `toggl_project` property, looked up by name in the projects (see [Projects](#projects))                                                                              |
-| Tags        | Tag ids returned by the tags URL, if set, plus a priority tag (see [Priority](#priority)): 🔺 `p:highest 🔺`, ⏫ `p:high ⏫`, 🔼 `p:medium 🔼`, 🔽 `p:low 🔽`, ⏬ `p:lowest ⏬` |
-| Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                                                                                                 |
+| Timer field | Comes from                                                                                                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Description | The task text without Tasks metadata (dates, priority, recurrence, `🆔`), `#tags` and link brackets                                                                                                  |
+| Project     | The note's `toggl_project` property, looked up by name in the projects (see [Projects](#projects))                                                                                                   |
+| Tags        | Tag ids returned by the tags URL, if set, plus an asked tag (see [Asked tags](#asked-tags)), by priority emoji: 🔺 `p:highest 🔺`, ⏫ `p:high ⏫`, 🔼 `p:medium 🔼`, 🔽 `p:low 🔽`, ⏬ `p:lowest ⏬` |
+| Toggl task  | `[toggl_task:: <project id>/<task id>]` in the line, created on the first start                                                                                                                      |
 
 On the **first start** of a task:
 
@@ -44,27 +47,19 @@ On the **first start** of a task:
 
 Later starts reuse that reference and don't ask for anything.
 
-### Priority
+### Asked tags
 
-With a priority tags file set, every timer gets at most one priority tag. Priority tags returned by the tags URL are dropped; the priority comes from:
+A tag named `category:value` belongs to that category, so `p:high ⏫` is in `p`. Adding a category asks all its tags, including ones added to Toggl later, in the order they were created. Each category is asked separately, so a timer for a task or note gets at most one tag per category. Single tags without a `:` form one group of their own. Tags returned by the tags URL are dropped if they are asked or in an asked category.
 
-1. The task's priority emoji, if it has one.
-2. Otherwise the note's `toggl_priority` property, e.g. `toggl_priority: p:high ⏫`. This is also the priority of note timers.
-3. Otherwise you pick one from the file's tags, and the choice is saved as `toggl_priority`. Pick **none** to save `toggl_priority: none`, so the note's timers get no priority tag and it doesn't ask again. Esc starts this timer without a priority and saves nothing.
+For each group, the tag comes from:
 
-A task without an emoji is "normal" in Tasks, but here it takes the note's priority instead.
+1. The task's priority emoji, for the `p` group, if that tag is asked.
+2. Otherwise the note's property for the group: `toggl_priority` for `p`, `toggl_<category>` for other categories, `toggl_tag` for tags without a category. For example `toggl_priority: p:high ⏫`. Note timers use it too.
+3. Otherwise you pick one of the group's tags, and the choice is saved to that property. Pick **none** to save `none`, so the note's timers get no tag from the group and it doesn't ask again. Esc starts this timer without one and saves nothing.
 
-To decide by your values rather than by urgency, give each tag a `desc`. The picker shows it under the tag name and searches it, so typing "health" finds the right level:
+A task without an emoji is "normal" in Tasks, but here it takes the note's tag instead.
 
-```json
-{
-	"p:highest 🔺": { "id": 1, "desc": "can't wait: a health problem, a deadline today" },
-	"p:high ⏫": { "id": 2, "desc": "keeps life running: health, sleep, home, core work" },
-	"p:medium 🔼": { "id": 3, "desc": "builds the long term: learning, reading" },
-	"p:low 🔽": { "id": 4, "desc": "new and optional: side projects, exploring tools" },
-	"p:lowest ⏬": { "id": 5, "desc": "only spends time: feeds, reels" }
-}
-```
+To decide by your values rather than by urgency, give each tag a description. The picker shows it under the tag name and searches it, so typing "health" finds the right tag.
 
 ### For a whole note
 
@@ -72,7 +67,7 @@ Press **Start note** in the running timer view or run **Start timer for current 
 
 ### For a pinned project
 
-The running timer view lists the projects pinned in Toggl, in the order set by dragging them under **Pinned projects** in the plugin settings; newly pinned ones go last. Click one to start a timer with only that project: no description, Toggl task or priority tag, just the tags URL's tags. It is for time that has no note, like calls or eating, so it is not synced to any note.
+The running timer view lists the projects pinned in Toggl, in the order set by dragging them under **Pinned projects** in the plugin settings; newly pinned ones go last. Click one to start a timer with only that project: no description, Toggl task or asked tag, just the tags URL's tags. It is for time that has no note, like calls or eating, so it is not synced to any note.
 
 ## Tracked time
 

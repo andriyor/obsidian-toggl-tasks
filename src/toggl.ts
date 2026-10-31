@@ -139,6 +139,21 @@ export class Toggl {
 			.map(({ name, id, pinned }) => ({ name, id, pinned }));
 	}
 
+	/** The default workspace's tags; `/me/tags` also returns other workspaces'. */
+	async tags(): Promise<{ name: string; id: number }[]> {
+		const wid = await this.workspace();
+		const res = await request({
+			url: `${API}/me/tags`,
+			headers: await this.headers(),
+		});
+		const tags = (res.json ?? []) as {
+			name: string;
+			id: number;
+			workspace_id: number;
+		}[];
+		return tags.filter((t) => t.workspace_id === wid);
+	}
+
 	/** The running entry, or null. A `/me` request: 30 per hour per user on every plan. */
 	async current(): Promise<TimeEntry | null> {
 		const res = await request({

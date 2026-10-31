@@ -10,7 +10,7 @@ const REF_RE = /\[toggl_task:: (\d+)\/(\d+)\]/u;
 const REF_VALUE_RE = /^(\d+)\/(\d+)$/u;
 const TIME_RE = /\[toggl:: ([^\]]*)\]/u;
 const PRIORITY_RE = /[🔺⏫🔼🔽⏬]/u;
-/** Tasks priority emoji → Toggl tag name, looked up in the priority tags file. */
+/** Tasks priority emoji → Toggl tag name, looked up in the asked tags. */
 const PRIORITY_TAGS: Record<string, string> = {
 	"🔺": "p:highest 🔺",
 	"⏫": "p:high ⏫",

@@ -1,4 +1,5 @@
-import { App, PluginSettingTab, SettingDefinitionItem, TFile } from "obsidian";
+import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
+import { AskedItem, askedList } from "./asked";
 import type TogglTasksPlugin from "./main";
 
 /** Vault-root file with `TOGGL_API_TOKEN=...`; keep it out of git. */
@@ -13,18 +14,25 @@ export interface Settings {
 	pinnedOrder: number[];
 	/** URL returning `[{ id }]` of tags to attach to every new timer. */
 	tagsUrl: string;
-	/** Vault path of a `{ "p:high ⏫": id, … }` JSON file for task priorities. */
-	priorityTagsPath: string;
+	/** `{ "tag name": id }`, written by "Update tags from Toggl". */
+	tags: Record<string, number>;
+	/** Categories and tags to pick from before a timer starts, in picker order. */
+	askedItems: AskedItem[];
+	/** Tag id → description shown under the tag in the picker. */
+	tagDescs: Record<number, string>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
 	projects: {},
 	pinnedOrder: [],
 	tagsUrl: "",
-	priorityTagsPath: "",
+	tags: {},
+	askedItems: [],
+	tagDescs: {},
 };
 
-const isJson = (file: TFile): boolean => file.extension === "json";
+/** Control key of a tag's description, followed by the tag id. */
+const DESC_KEY = "asked-desc:";
 
 /** Declarative, so the settings show up in Obsidian's settings search. */
 export class TogglTasksSettingTab extends PluginSettingTab {
@@ -35,7 +43,17 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	getSettingDefinitions(): SettingDefinitionItem<keyof Settings>[] {
+	getControlValue(key: string): unknown {
+		if (!key.startsWith(DESC_KEY)) return super.getControlValue(key);
+		return this.plugin.settings.tagDescs[Number(key.slice(DESC_KEY.length))] ?? "";
+	}
+
+	setControlValue(key: string, value: unknown): void | Promise<void> {
+		if (!key.startsWith(DESC_KEY)) return super.setControlValue(key, value);
+		return this.plugin.setTagDesc(Number(key.slice(DESC_KEY.length)), String(value));
+	}
+
+	getSettingDefinitions(): SettingDefinitionItem[] {
 		return [
 			{
 				name: "API token",
@@ -64,14 +82,38 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 				},
 			},
 			{
-				name: "Priority tags file",
-				desc: 'Optional. Vault path of a JSON file mapping tag names such as "p:high ⏫" to ids, or to { id, desc } with a description shown when picking a note\'s priority.',
-				control: {
-					type: "file",
-					key: "priorityTagsPath",
-					placeholder: "scripts/toggl-priority-tags.json",
-					filter: isJson,
+				name: "Update tags from Toggl",
+				desc: `${Object.keys(this.plugin.settings.tags).length} tags. Click, or run the command of the same name, after changing tags in Toggl.`,
+				action: () => void this.plugin.updateTags().then(() => this.update()),
+			},
+			{
+				type: "list",
+				heading: "Asked tags",
+				emptyState:
+					"Add categories, such as p for p:high and p:low, or single tags to pick from before a timer starts.",
+				items: askedList(this.plugin.settings.tags, this.plugin.settings.askedItems).map(
+					({ label }) => ({ name: label }),
+				),
+				addItem: {
+					name: "Add category or tag",
+					action: () => void this.plugin.addAskedItem().then(() => this.update()),
 				},
+				onReorder: (from, to) =>
+					void this.plugin.moveAskedItem(from, to).then(() => this.update()),
+				onDelete: (index) =>
+					void this.plugin.removeAskedItem(index).then(() => this.update()),
+			},
+			{
+				type: "group",
+				heading: "Tag descriptions",
+				items: this.plugin.askedTags().map((tag) => ({
+					name: tag.name,
+					control: {
+						type: "text",
+						key: `${DESC_KEY}${tag.id}`,
+						placeholder: "Shown in the picker",
+					},
+				})),
 			},
 		];
 	}

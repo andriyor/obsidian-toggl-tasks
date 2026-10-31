@@ -1,5 +1,15 @@
 import { EditorView } from "@codemirror/view";
 import { editorInfoField, MarkdownView, Notice, Plugin, TFile } from "obsidian";
+import {
+	addableItems,
+	askedGroups,
+	askedList,
+	askedTags,
+	category,
+	categoryProperty,
+	NamedTag,
+	withoutAsked,
+} from "./asked";
 import { startButtons } from "./button";
 import { PickModal } from "./pick";
 import { movePinned, sortPinned } from "./pinned";
@@ -29,23 +39,14 @@ const TOKEN_RE = /^TOGGL_API_TOKEN=["']?([^"'\n]+)/m;
 const HOURS_PROPERTY = "toggl_hours";
 /** Note property with the note's own Toggl task, `project/task`. */
 const NOTE_TASK_PROPERTY = "toggl_task";
-/** Note property with the priority tag name for tasks without a priority emoji. */
-const PRIORITY_PROPERTY = "toggl_priority";
-/** `toggl_priority` value for a note whose timers get no priority tag. */
-const NO_PRIORITY = "none";
+/** Note property value for a note whose timers get no tag of that category. */
+const NO_TAG = "none";
 
 export interface Project {
 	name: string;
 	id: number;
 	/** Pinned in Toggl; listed in the running timer view. */
 	pinned: boolean;
-}
-
-interface PriorityTag {
-	name: string;
-	id: number;
-	/** Shown under the name in the priority picker, e.g. what counts as high. */
-	desc?: string;
 }
 
 export default class TogglTasksPlugin extends Plugin {
@@ -106,6 +107,12 @@ export default class TogglTasksPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "update-tags",
+			name: "Update tags from Toggl",
+			callback: () => void this.updateTags(),
+		});
+
+		this.addCommand({
 			id: "sync-note",
 			name: "Update tracked time in current note",
 			checkCallback: (checking) => {
@@ -162,15 +169,15 @@ export default class TogglTasksPlugin extends Plugin {
 	 */
 	async startProjectTimer(project: Project): Promise<void> {
 		try {
-			await this.startEntry("", project.id, null, project.name, null);
+			await this.startEntry("", project.id, null, project.name, []);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
 		}
 	}
 
 	/**
-	 * Starts the entry with the current tags plus the `priority` tag, and shows
-	 * it in the running timer view. Without a `ref`, picks the note's project and
+	 * Starts the entry with the current tags plus an asked tag, and shows it in
+	 * the running timer view. Without a `ref`, picks the note's project and
 	 * creates a Toggl task there, handing it to `save`; Esc in the picker starts
 	 * without a project.
 	 */
@@ -195,17 +202,12 @@ export default class TogglTasksPlugin extends Plugin {
 				}
 			}
 			projectName ??= ref ? this.projectName(ref.projectId) : null;
-			const priorityId = await this.priorityTagId(
-				file,
-				priority,
-				await this.loadPriorityTags(),
-			);
 			await this.startEntry(
 				description,
 				ref?.projectId ?? null,
 				ref?.taskId ?? null,
 				projectName,
-				priorityId,
+				await this.askedTagIds(file, priority),
 			);
 		} catch (e) {
 			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -213,23 +215,24 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Starts the entry with the tags URL's tags plus `priorityId`, and shows it
-	 * in the running timer view.
+	 * Starts the entry with the tags URL's tags plus `askedIds`, and shows it in
+	 * the running timer view.
 	 */
 	private async startEntry(
 		description: string,
 		projectId: number | null,
 		taskId: number | null,
 		projectName: string | null,
-		priorityId: number | null,
+		askedIds: number[],
 	): Promise<void> {
-		// The entry gets at most one priority tag, from the task or note, so drop
-		// any the tags URL returns.
-		const priorityIds = new Set((await this.loadPriorityTags()).map((t) => t.id));
-		const tagIds = (await fetchTagIds(this.settings.tagsUrl)).filter(
-			(id) => !priorityIds.has(id),
-		);
-		if (priorityId) tagIds.push(priorityId);
+		const tagIds = [
+			...withoutAsked(
+				await fetchTagIds(this.settings.tagsUrl),
+				this.settings.tags,
+				this.askedTags(),
+			),
+			...askedIds,
+		];
 		const entry = await this.toggl.start(description, projectId, tagIds, taskId);
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_RUNNING)) {
 			if (leaf.view instanceof RunningTimerView) leaf.view.show(entry);
@@ -240,45 +243,52 @@ export default class TogglTasksPlugin extends Plugin {
 	}
 
 	/**
-	 * Tag id in `tags` for the task's `priority`, else the note's. Null when the
-	 * priority tags file is unset or there is no priority.
+	 * One asked tag per category: the task's `priority` if it is of that category,
+	 * else the note's.
 	 */
-	private async priorityTagId(
+	private async askedTagIds(
 		file: TFile | null,
 		priority: string | null,
-		tags: PriorityTag[],
-	): Promise<number | null> {
-		if (!tags.length) return null;
-		const name = priority ?? (file ? await this.notePriority(file, tags) : null);
-		if (!name || name === NO_PRIORITY) return null;
-		const tag = tags.find((t) => t.name === name);
-		if (!tag)
-			new Notice(`Toggl: tag "${name}" is not in ${this.settings.priorityTagsPath}`);
-		return tag?.id ?? null;
+	): Promise<number[]> {
+		const ids: number[] = [];
+		for (const [cat, group] of askedGroups(this.askedTags())) {
+			const fromTask = priority !== null && category(priority) === cat ? priority : null;
+			const name = fromTask ?? (file ? await this.noteTag(file, cat, group) : null);
+			if (!name || name === NO_TAG) continue;
+			const tag = group.find((t) => t.name === name);
+			if (tag) ids.push(tag.id);
+			else new Notice(`Toggl: tag "${name}" is not in the asked tags`);
+		}
+		return ids;
 	}
 
 	/**
-	 * The note's `toggl_priority`, else a choice from `tags`, shown with their
-	 * descriptions and saved as `toggl_priority` ("none" saves no priority; Esc =
-	 * none, saves nothing).
+	 * The note's property for `cat`, else a choice from `tags`, shown with their
+	 * descriptions and saved to that property ("none" saves no tag; Esc = none,
+	 * saves nothing).
 	 */
-	private async notePriority(file: TFile, tags: PriorityTag[]): Promise<string | null> {
-		const saved = this.noteProperty(file, PRIORITY_PROPERTY);
+	private async noteTag(
+		file: TFile,
+		cat: string,
+		tags: NamedTag[],
+	): Promise<string | null> {
+		const property = categoryProperty(cat);
+		const saved = this.noteProperty(file, property);
 		if (typeof saved === "string") return saved;
 		const descs = new Map(tags.map((t) => [t.name, t.desc]));
-		descs.set(NO_PRIORITY, "No priority tag, and this note doesn't ask again");
+		descs.set(NO_TAG, "No tag, and this note doesn't ask again");
 		const picked = await new PickModal(
 			this.app,
 			[...descs.keys()],
 			(name) => name,
-			"Toggl priority (Esc = none this time)",
+			`Toggl ${cat ? `${cat}: ` : ""}tag (Esc = none this time)`,
 			(name) => descs.get(name),
 		).choose();
 		if (picked) {
 			await this.app.fileManager.processFrontMatter(
 				file,
 				(fm: Record<string, unknown>) => {
-					fm[PRIORITY_PROPERTY] = picked;
+					fm[property] = picked;
 				},
 			);
 		}
@@ -425,20 +435,70 @@ export default class TogglTasksPlugin extends Plugin {
 		}
 	}
 
-	/** The priority tags file: each tag name maps to an id or `{ id, desc }`. */
-	private async loadPriorityTags(): Promise<PriorityTag[]> {
-		const map = await this.loadJson<number | Omit<PriorityTag, "name">>(
-			this.settings.priorityTagsPath,
-		);
-		return Object.entries(map).map(([name, value]) =>
-			typeof value === "number" ? { name, id: value } : { name, ...value },
+	/** Saves Toggl's tags to the plugin data; asked tags stay, going by id. */
+	async updateTags(): Promise<void> {
+		try {
+			const tags = await this.toggl.tags();
+			this.settings.tags = Object.fromEntries(tags.map(({ name, id }) => [name, id]));
+			await this.saveData(this.settings);
+			new Notice(`Toggl: ${tags.length} tags updated`);
+		} catch (e) {
+			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
+	/** The tags the asked list stands for. */
+	askedTags(): NamedTag[] {
+		return askedTags(
+			this.settings.tags,
+			this.settings.askedItems,
+			this.settings.tagDescs,
 		);
 	}
 
-	/** A `{ "name": value }` JSON file in the vault; empty when unset or missing. */
-	private async loadJson<V>(path: string): Promise<Record<string, V>> {
-		if (!path || !(await this.app.vault.adapter.exists(path))) return {};
-		return JSON.parse(await this.app.vault.adapter.read(path)) as Record<string, V>;
+	/** Picks a category or tag that isn't in the asked list and adds it last. */
+	async addAskedItem(): Promise<void> {
+		const items = addableItems(this.settings.tags, this.settings.askedItems);
+		if (!items.length) {
+			new Notice("Toggl: nothing to add, update tags from Toggl first");
+			return;
+		}
+		const picked = await new PickModal(
+			this.app,
+			items,
+			(c) => c.label,
+			"Category or tag to ask before starting a timer",
+		).choose();
+		if (!picked) return;
+		this.settings.askedItems.push(picked.item);
+		await this.saveData(this.settings);
+	}
+
+	/** `from` and `to` are indices of the asked list shown in the settings. */
+	async moveAskedItem(from: number, to: number): Promise<void> {
+		const items = this.shownAskedItems();
+		items.splice(to, 0, ...items.splice(from, 1));
+		this.settings.askedItems = items;
+		await this.saveData(this.settings);
+	}
+
+	/** `index` is an index of the asked list shown in the settings. */
+	async removeAskedItem(index: number): Promise<void> {
+		const items = this.shownAskedItems();
+		items.splice(index, 1);
+		this.settings.askedItems = items;
+		await this.saveData(this.settings);
+	}
+
+	async setTagDesc(id: number, desc: string): Promise<void> {
+		if (desc) this.settings.tagDescs[id] = desc;
+		else delete this.settings.tagDescs[id];
+		await this.saveData(this.settings);
+	}
+
+	/** The saved list without entries gone from Toggl, as the settings show it. */
+	private shownAskedItems() {
+		return askedList(this.settings.tags, this.settings.askedItems).map((c) => c.item);
 	}
 
 	/**
