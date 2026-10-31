@@ -6,6 +6,8 @@ The note is the single place a task is written. Like the [Toggl Track browser ex
 
 For time, Toggl stays the source of truth: timers are stopped in the Toggl apps, and the plugin reads the totals back from the Toggl API.
 
+For a similar link between notes and Todoist, see [Sync with Todoist](https://github.com/jamiebrynes7/obsidian-todoist-plugin), which shows Todoist tasks in notes and syncs them both ways.
+
 Desktop only, Obsidian 1.13 or later.
 
 ## Setup
@@ -124,5 +126,9 @@ pnpm check   # typecheck, lint, format check and tests
 
 ## Todo
 
-- [ ] Optional token from Obsidian's secret storage (a `secret` control in the settings definitions + `app.secretStorage`), for vaults without a `.env`
+- [ ] Optional token from Obsidian's secret storage, for vaults without a `.env`: a setting that chooses where the token is kept and moves it when changed, keeping only the secret's name in `data.json`, like [Sync with Todoist](https://github.com/jamiebrynes7/obsidian-todoist-plugin) (`plugin/src/services/tokenAccessor.ts`). `.env` stays the default here, see the secret storage decision above.
+- [ ] Token check in the settings, like Sync with Todoist's `TokenChecker`, run only on click because it would use a `/me` request.
+- [ ] Optional auto-refresh of the open note's tracked time, off by default, with a toggle and an interval (`registerInterval`). It reads project tasks, not `/me`, so it avoids that limit, and it would retry failed status updates.
+- [ ] Release workflow that builds on a tag and creates a draft GitHub release with `main.js`, `manifest.json` and `styles.css`, if the plugin gets published.
+- [ ] Maybe a ` ```toggl ` code block showing time by project or for today, like Sync with Todoist's query blocks. Needs the Reports API.
 - [ ] Running timer from the [toggl-lock](https://github.com/andriyor/toggl-lock) server instead of the Toggl API: its webhook-fed `state.display` (`{ message, project, startedAt }`) is current within seconds and polling it costs no Toggl quota. Needs a narrow `GET /display` route there (today only `GET /state`, which also exposes push tokens) and a URL + `APP_SECRET` setting here.
