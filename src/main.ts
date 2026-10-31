@@ -582,6 +582,12 @@ export default class TogglTasksPlugin extends Plugin {
 		return TOKEN_RE.exec(env)?.[1].trim() ?? null;
 	}
 
+	/** Without this, the next save would overwrite outside edits to `data.json`. */
+	async onExternalSettingsChange(): Promise<void> {
+		await this.loadSettings();
+		this.renderRunningViews();
+	}
+
 	async loadSettings(): Promise<void> {
 		this.settings = {
 			...DEFAULT_SETTINGS,
