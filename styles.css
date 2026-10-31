@@ -94,3 +94,16 @@
 	display: flex;
 	gap: 0.4em;
 }
+
+/* Descriptions are sentences: a fixed name column lines up the inputs, which get the rest. */
+.toggl-tasks-descriptions .setting-item-info {
+	flex: 0 0 10em;
+}
+
+.toggl-tasks-descriptions .setting-item-control {
+	flex: 1 1 0;
+}
+
+.toggl-tasks-descriptions .setting-item-control input {
+	width: 100%;
+}

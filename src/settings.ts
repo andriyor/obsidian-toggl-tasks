@@ -106,6 +106,7 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			{
 				type: "group",
 				heading: "Tag descriptions",
+				cls: "toggl-tasks-descriptions",
 				items: this.plugin.askedTags().map((tag) => ({
 					name: tag.name,
 					control: {
