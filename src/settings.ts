@@ -12,7 +12,7 @@ export interface Settings {
 	projects: Record<string, { id: number; pinned: boolean }>;
 	/** Ids of pinned projects in the order the running timer view lists them. */
 	pinnedOrder: number[];
-	/** URL returning `[{ id }]` of tags to attach to every new timer. */
+	/** URL returning `[{ id }]` of tags for every new timer; set in `data.json` only. */
 	tagsUrl: string;
 	/** `{ "tag name": id }`, written by "Update tags from Toggl". */
 	tags: Record<string, number>;
@@ -79,15 +79,6 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 				items: this.plugin.pinnedProjects().map((p) => ({ name: p.name })),
 				onReorder: (from, to) =>
 					void this.plugin.movePinnedProject(from, to).then(() => this.update()),
-			},
-			{
-				name: "Tags URL",
-				desc: "Optional. Returns [{ id }] of tags added to every new timer.",
-				control: {
-					type: "text",
-					key: "tagsUrl",
-					placeholder: "http://tags.lan/api/selected-tags",
-				},
 			},
 			{
 				name: "Update tags from Toggl",

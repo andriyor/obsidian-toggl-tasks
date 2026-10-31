@@ -15,7 +15,7 @@ Desktop only, Obsidian 1.13 or later.
 | Setting   | Description                                                                                                                                       |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API token | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git. Press **Check** in the settings to try it. |
-| Tags URL  | Optional. Returns `[{ "id": 123 }, …]`.                                                                                                           |
+| Tags URL  | Not in the settings: an optional `tagsUrl` in `data.json`, returning `[{ "id": 123 }, …]`. Its tags are added to every new timer.                 |
 
 ### Projects
 
