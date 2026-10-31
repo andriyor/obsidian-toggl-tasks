@@ -435,6 +435,15 @@ export default class TogglTasksPlugin extends Plugin {
 		}
 	}
 
+	/** Tries the token against Toggl; only on click, `/me` is limited to 30 per hour. */
+	async checkToken(): Promise<void> {
+		try {
+			new Notice(`Toggl: token works, signed in as ${await this.toggl.account()}`);
+		} catch (e) {
+			new Notice(`Toggl failed: ${e instanceof Error ? e.message : String(e)}`);
+		}
+	}
+
 	/** Saves Toggl's tags to the plugin data; asked tags stay, going by id. */
 	async updateTags(): Promise<void> {
 		try {

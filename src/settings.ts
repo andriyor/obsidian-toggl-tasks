@@ -58,6 +58,11 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			{
 				name: "API token",
 				desc: `Read from TOGGL_API_TOKEN in ${ENV_FILE} at the vault root.`,
+				render: (setting) => {
+					setting.addButton((button) =>
+						button.setButtonText("Check").onClick(() => void this.plugin.checkToken()),
+					);
+				},
 			},
 			{
 				name: "Update projects from Toggl",

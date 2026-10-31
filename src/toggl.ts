@@ -139,6 +139,12 @@ export class Toggl {
 			.map(({ name, id, pinned }) => ({ name, id, pinned }));
 	}
 
+	/** The token's account name; throws if the token is missing or rejected. A `/me` request. */
+	async account(): Promise<string> {
+		const me = await request({ url: `${API}/me`, headers: await this.headers() });
+		return (me.json as { fullname: string }).fullname;
+	}
+
 	/** The default workspace's tags; `/me/tags` also returns other workspaces'. */
 	async tags(): Promise<{ name: string; id: number }[]> {
 		const wid = await this.workspace();

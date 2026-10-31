@@ -12,10 +12,10 @@ Desktop only, Obsidian 1.13 or later.
 
 ## Setup
 
-| Setting   | Description                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------ |
-| API token | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git. |
-| Tags URL  | Optional. Returns `[{ "id": 123 }, …]`.                                                                |
+| Setting   | Description                                                                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API token | Not a setting: read from `TOGGL_API_TOKEN=...` in `.env` at the vault root. Keep that file out of git. Press **Check** in the settings to try it. |
+| Tags URL  | Optional. Returns `[{ "id": 123 }, …]`.                                                                                                           |
 
 ### Projects
 
@@ -127,7 +127,6 @@ pnpm check   # typecheck, lint, format check and tests
 ## Todo
 
 - [ ] Optional token from Obsidian's secret storage, for vaults without a `.env`: a setting that chooses where the token is kept and moves it when changed, keeping only the secret's name in `data.json`, like [Sync with Todoist](https://github.com/jamiebrynes7/obsidian-todoist-plugin) (`plugin/src/services/tokenAccessor.ts`). `.env` stays the default here, see the secret storage decision above.
-- [ ] Token check in the settings, like Sync with Todoist's `TokenChecker`, run only on click because it would use a `/me` request.
 - [ ] Optional auto-refresh of the open note's tracked time, off by default, with a toggle and an interval (`registerInterval`). It reads project tasks, not `/me`, so it avoids that limit, and it would retry failed status updates.
 - [ ] Release workflow that builds on a tag and creates a draft GitHub release with `main.js`, `manifest.json` and `styles.css`, if the plugin gets published.
 - [ ] Maybe a ` ```toggl ` code block showing time by project or for today, like Sync with Todoist's query blocks. Needs the Reports API.
