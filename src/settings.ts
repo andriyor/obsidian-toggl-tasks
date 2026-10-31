@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, SettingDefinitionItem } from "obsidian";
+import { App, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
 import { AskedItem, askedList } from "./asked";
 import type TogglTasksPlugin from "./main";
 
@@ -66,8 +66,9 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Update projects from Toggl",
-				desc: `${this.projectCount()} Click, or run the command of the same name, after changing projects in Toggl. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting. Pinned projects are listed in the running timer view.`,
-				action: () => void this.plugin.updateProjects().then(() => this.update()),
+				desc: `${this.projectCount()} Press the button, or run the command of the same name, after changing projects in Toggl. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting. Pinned projects are listed in the running timer view.`,
+				render: (setting) =>
+					this.addRefreshButton(setting, () => this.plugin.updateProjects()),
 			},
 			{
 				type: "list",
@@ -88,8 +89,9 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Update tags from Toggl",
-				desc: `${Object.keys(this.plugin.settings.tags).length} tags. Click, or run the command of the same name, after changing tags in Toggl.`,
-				action: () => void this.plugin.updateTags().then(() => this.update()),
+				desc: `${Object.keys(this.plugin.settings.tags).length} tags. Press the button, or run the command of the same name, after changing tags in Toggl.`,
+				render: (setting) =>
+					this.addRefreshButton(setting, () => this.plugin.updateTags()),
 			},
 			{
 				type: "list",
@@ -122,6 +124,15 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 				})),
 			},
 		];
+	}
+
+	private addRefreshButton(setting: Setting, refresh: () => Promise<void>): void {
+		setting.addExtraButton((button) =>
+			button
+				.setIcon("refresh-cw")
+				.setTooltip("Update from Toggl")
+				.onClick(() => void refresh().then(() => this.update())),
+		);
 	}
 
 	private projectCount(): string {

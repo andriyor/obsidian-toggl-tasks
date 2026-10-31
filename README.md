@@ -19,7 +19,7 @@ Desktop only, Obsidian 1.13 or later.
 
 ### Projects
 
-Run **Update projects from Toggl**, from the command palette or by clicking it in the plugin settings, once, and again after adding, renaming or pinning projects in Toggl. It saves the active projects, sorted by name, with their ids and whether they are pinned, to the plugin's `data.json`.
+Run **Update projects from Toggl**, from the command palette or with its refresh button in the plugin settings, once, and again after adding, renaming or pinning projects in Toggl. It saves the active projects, sorted by name, with their ids and whether they are pinned, to the plugin's `data.json`.
 
 ### Tags
 
