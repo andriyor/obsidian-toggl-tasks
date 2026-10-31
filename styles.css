@@ -107,3 +107,9 @@
 .toggl-tasks-descriptions .setting-item-control input {
 	width: 100%;
 }
+
+.toggl-tasks-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	white-space: nowrap;
+}

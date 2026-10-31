@@ -66,9 +66,11 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Update projects from Toggl",
-				desc: `${this.projectCount()} Press the button, or run the command of the same name, after changing projects in Toggl. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting. Pinned projects are listed in the running timer view.`,
+				desc: `Press the button, or run the command of the same name, after changing projects in Toggl. A note's "${PROJECT_PROPERTY}" property picks one; otherwise you choose when starting. Pinned projects are listed in the running timer view.`,
 				render: (setting) =>
-					this.addRefreshButton(setting, () => this.plugin.updateProjects()),
+					this.addRefreshButton(setting, this.projectCount(), () =>
+						this.plugin.updateProjects(),
+					),
 			},
 			{
 				type: "list",
@@ -89,9 +91,13 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 			},
 			{
 				name: "Update tags from Toggl",
-				desc: `${Object.keys(this.plugin.settings.tags).length} tags. Press the button, or run the command of the same name, after changing tags in Toggl.`,
+				desc: "Press the button, or run the command of the same name, after changing tags in Toggl.",
 				render: (setting) =>
-					this.addRefreshButton(setting, () => this.plugin.updateTags()),
+					this.addRefreshButton(
+						setting,
+						`${Object.keys(this.plugin.settings.tags).length} tags`,
+						() => this.plugin.updateTags(),
+					),
 			},
 			{
 				type: "list",
@@ -126,7 +132,13 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 		];
 	}
 
-	private addRefreshButton(setting: Setting, refresh: () => Promise<void>): void {
+	/** Puts what is saved next to the button that updates it. */
+	private addRefreshButton(
+		setting: Setting,
+		count: string,
+		refresh: () => Promise<void>,
+	): void {
+		setting.controlEl.createSpan({ cls: "toggl-tasks-count", text: count });
 		setting.addExtraButton((button) =>
 			button
 				.setIcon("refresh-cw")
@@ -138,6 +150,6 @@ export class TogglTasksSettingTab extends PluginSettingTab {
 	private projectCount(): string {
 		const projects = Object.values(this.plugin.settings.projects);
 		const pinned = projects.filter((p) => p.pinned).length;
-		return `${projects.length} projects, ${pinned} pinned.`;
+		return `${projects.length} projects, ${pinned} pinned`;
 	}
 }
